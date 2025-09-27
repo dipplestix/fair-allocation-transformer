@@ -38,7 +38,7 @@ class FACrossAttentionBlock(nn.Module):
 
 
 class FATransformer(nn.Module):
-    def __init__(self, n, m, d_model: int, num_heads: int, num_output_layers: int = 1, dropout: float = 0.0):
+    def __init__(self, n, m, d_model: int, num_heads: int, num_output_layers: int = 1, dropout: float = 0.0, initial_temperature: float = 1.0, final_temperature: float = 0.01):
         super().__init__()
 
         self.d_model = d_model
@@ -47,6 +47,9 @@ class FATransformer(nn.Module):
         self.dropout = dropout
         self.n = n
         self.m = m
+        self.initial_temperature = initial_temperature
+        self.final_temperature = final_temperature
+        self.temperature = initial_temperature
         
         self.agent_proj = nn.Linear(m, d_model, bias=True)
         self.item_proj = nn.Linear(n, d_model, bias=True)
@@ -61,6 +64,16 @@ class FATransformer(nn.Module):
 
         self.o_norm = nn.RMSNorm(d_model)
         
+    def update_temperature(self, temperature: float):
+        """Update the temperature parameter for softmax scaling"""
+        self.temperature = temperature
+        
+    def eval(self):
+        """Set model to evaluation mode and use final temperature"""
+        super().eval()
+        self.temperature = self.final_temperature
+        return self
+                
     def forward(self, x: torch.Tensor):
         B, n, m = x.shape
         
@@ -78,5 +91,5 @@ class FATransformer(nn.Module):
         x_output = self.o_norm(x_output)
         x_output = self.output_proj(x_output)
 
-        x_output = F.softmax(x_output, dim=-1)
+        x_output = F.softmax(x_output / self.temperature, dim=-1)
         return x_output
