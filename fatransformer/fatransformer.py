@@ -77,10 +77,18 @@ class FATransformer(nn.Module):
     def forward(self, x: torch.Tensor):
         B, n, m = x.shape
         
-        x_agent = self.agent_proj(x)
 
-        x = x.view(B, m, n)
-        x_item = self.item_proj(x)
+        if m < self.m:
+            pad_size = self.m - m
+            x_agent = torch.cat([x, torch.zeros(B, n, pad_size, device=x.device, dtype=x.dtype)], dim=2)
+            m = self.m 
+        else:
+            x_agent = x
+
+        x_agent = self.agent_proj(x_agent)  # expects input of shape (B, n, m)
+
+        x_item = x.permute(0, 2, 1)
+        x_item = self.item_proj(x_item)  # (B, m, n) -> (B, m, d_model)
 
         x_agent = self.agent_transformer(x_agent)
         x_item = self.item_transformer(x_item)
