@@ -126,7 +126,11 @@ class PoolLayer(nn.Module):
 
 
 class ExchangeableLayer(nn.Module):
-    def __init__(self, in_channels: int, out_channels: int, pool_config: dict = {'row': 'mean', 'column': 'mean', 'global': 'mean'}):
+    def __init__(self, 
+                 in_channels: int, 
+                 out_channels: int, 
+                 pool_config: dict = {'row': 'mean', 'column': 'mean', 'global': 'mean'},
+                 activation: nn.Module = nn.GELU()):
         super().__init__()
         self.in_channels = in_channels
         self.out_channels = out_channels
@@ -150,7 +154,7 @@ class ExchangeableLayer(nn.Module):
         B, n, m, _ = x.shape
         x = self.pool_layer(x)
         x = x.view(B, n*m, self.lin_in)
-        x = self.proj(x)
+        x = self.activation(self.proj(x))
         x = x.view(B, n, m, self.out_channels)
         return x
     
