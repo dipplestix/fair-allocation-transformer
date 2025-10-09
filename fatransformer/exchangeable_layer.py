@@ -134,8 +134,6 @@ class ExchangeableLayer(nn.Module):
         super().__init__()
         self.in_channels = in_channels
         self.out_channels = out_channels
-
-        self.pool_layer = PoolLayer(pool_config)
         
         # Calculate total number of aggregation functions
         total_aggs = 0
@@ -146,7 +144,10 @@ class ExchangeableLayer(nn.Module):
                 total_aggs += len(agg_funcs)
         
         self.lin_in = in_channels + total_aggs*in_channels
+
+        self.pool_layer = PoolLayer(pool_config)
         self.proj = nn.Linear(in_channels + total_aggs*in_channels, out_channels, bias=True)
+        self.activation = activation
         
 
 
