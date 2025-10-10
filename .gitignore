@@ -149,3 +149,9 @@ Thumbs.db
 *.tmp
 *.temp
 *~
+
+uv.lock
+
+eval_pipeline/model_assets/*.pt
+
+eval_pipeline/results/*
