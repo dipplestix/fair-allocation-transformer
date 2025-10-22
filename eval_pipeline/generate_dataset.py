@@ -9,7 +9,7 @@ def generate_valuation_matrix(n_agents, m_items):
     return np.random.uniform(0, 1, size=(n_agents, m_items))
 
 
-def generate_dataset(n_agents, n_items, num_matrices, output_file):
+def generate_dataset(n_agents, n_items, num_matrices, output_file, seed=10):
     """Generate dataset of valuation matrices with precomputed max welfare values"""
 
     matrices = []
@@ -20,6 +20,9 @@ def generate_dataset(n_agents, n_items, num_matrices, output_file):
     nash_times = []
     util_times = []
     generation_times = []
+
+    # Set seed
+    np.random.seed(seed * n_items + n_agents)
 
     print(f"Generating {num_matrices} valuation matrices ({n_agents} agents, {n_items} items)...")
 
