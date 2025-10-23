@@ -47,7 +47,7 @@ def main():
         except ValueError:
             continue
 
-        if (args.num_agents_list is None or num_agents in args.num_agents_list) and (args.num_item_list is None or num_items in args.num_item_list) and (args.num_matrices_list is None or num_matrices in args.num_matrices_list):
+        if (args.num_agents_list is None or num_agents in args.num_agents_list) and (args.num_items_list is None or num_items in args.num_items_list) and (args.num_matrices_list is None or num_matrices in args.num_matrices_list):
             filtered_files.append(npz_file)
 
     print(f"Found {len(filtered_files)} matching .npz files for evaluation.")

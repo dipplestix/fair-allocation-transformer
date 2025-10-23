@@ -30,22 +30,28 @@ def load_model(model_config):
     project="fa-transformer-temp", 
     config=config)
 
-    # verify model_file exists in config
-    model_file = config.get("model_weight_path", None)
-    if model_file is None:
+    # verify model_weights_file exists in config
+    model_weights_file = config.get("model_weight_path", None)
+    if model_weights_file is None:
         raise ValueError("model_weight_path not found in model_config")
 
     # verify file exists
-    if not os.path.exists(model_file):
-        raise ValueError(f"Model file {model_file} not found")
+    if not os.path.exists(model_weights_file):
+        raise ValueError(f"Model file {model_weights_file} not found")
 
     # load helper files
     module_name = "fatransformer"
     module_path = config["model_def_path"]
     fatransformer = load_helper_module(module_path, module_name)
+
+    # dynamically get model class
+    try:
+        ModelClass = getattr(fatransformer, config["model_class_def"])
+    except AttributeError:
+        raise ValueError(f"Class {config['model_class_def']} not found in {module_path}")
    
-    model = fatransformer.FATransformer(config["n"], config["m"], config["d_model"], config["num_heads"], config["num_output_layers"], config["dropout"])
-    model.load_state_dict(torch.load(model_file, map_location=device))
+    model = ModelClass(config["n"], config["m"], config["d_model"], config["num_heads"], config["num_output_layers"], config["dropout"])
+    model.load_state_dict(torch.load(model_weights_file, map_location=device))
     model.to(device)
     model.eval()
     
