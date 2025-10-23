@@ -1,5 +1,7 @@
 import argparse
 import time
+from pathlib import Path
+
 import numpy as np
 from tqdm import tqdm
 from utils.max_utility import best_nash_welfare, best_utilitarian_welfare, best_nash_welfare_bruteforce
@@ -67,17 +69,20 @@ def generate_dataset(n_agents, n_items, num_matrices, output_file, seed=10):
     
     
     print(f"\n======Completed generating {num_matrices} matrices======")
-    
+
+    output_path = Path(output_file)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
     # Save as compressed numpy archive with timing data
-    print(f"Saving dataset to {output_file}...")
-    np.savez_compressed(output_file,
+    print(f"Saving dataset to {output_path}...")
+    np.savez_compressed(output_path,
         matrices=np.array(matrices),        # shape: (num_matrices, n_agents, n_items)
         nash_welfare=np.array(nash_values), # shape: (num_matrices,)
         util_welfare=np.array(util_values), # shape: (num_matrices,)
     )
 
     # save timing data to csv
-    timing_output_file = output_file.replace('.npz', '_timing.csv')
+    timing_output_file = output_path.with_name(output_path.stem + '_timing.csv')
     print(f"Saving timing data to {timing_output_file}...")
     with open(timing_output_file, 'w') as f:
         f.write("matrix_index,generation_time_ms,nash_time_ms,util_time_ms\n")
@@ -97,7 +102,7 @@ def generate_dataset(n_agents, n_items, num_matrices, output_file, seed=10):
     print(f"Average total time per matrix: {(avg_generation_time + avg_nash_time + avg_util_time):.2f}ms")
 
     # save timing statistics to a text file
-    stats_output_file = output_file.replace('.npz', '_timing_stats.txt')
+    stats_output_file = output_path.with_name(output_path.stem + '_timing_stats.txt')
     print(f"Saving timing statistics to {stats_output_file}...")
     with open(stats_output_file, 'w') as f:
         f.write(f"Total processing time: {total_time:.2f} seconds\n")
