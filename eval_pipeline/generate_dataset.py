@@ -64,7 +64,7 @@ def generate_dataset(n_agents, n_items, num_matrices, output_file, seed=10):
     avg_generation_time = np.mean(generation_times)
     avg_nash_time = np.mean(nash_times)
     avg_util_time = np.mean(util_times)
-    output_file = "datasets/" + output_file
+    
     
     print(f"\n======Completed generating {num_matrices} matrices======")
     
@@ -96,6 +96,16 @@ def generate_dataset(n_agents, n_items, num_matrices, output_file, seed=10):
     print(f"Average utilitarian welfare calculation time: {avg_util_time:.2f}ms")
     print(f"Average total time per matrix: {(avg_generation_time + avg_nash_time + avg_util_time):.2f}ms")
 
+    # save timing statistics to a text file
+    stats_output_file = output_file.replace('.npz', '_timing_stats.txt')
+    print(f"Saving timing statistics to {stats_output_file}...")
+    with open(stats_output_file, 'w') as f:
+        f.write(f"Total processing time: {total_time:.2f} seconds\n")
+        f.write(f"Average matrix generation time: {avg_generation_time:.2f}ms\n")
+        f.write(f"Average Nash welfare calculation time: {avg_nash_time:.2f}ms\n")
+        f.write(f"Average utilitarian welfare calculation time: {avg_util_time:.2f}ms\n")
+        f.write(f"Average total time per matrix: {(avg_generation_time + avg_nash_time + avg_util_time):.2f}ms\n")
+
     
 
 def main():
@@ -103,9 +113,12 @@ def main():
     parser.add_argument('--agents', type=int, default=10, help='Number of agents (default: 10)')
     parser.add_argument('--items', type=int, default=14, help='Number of items (default: 14)')
     parser.add_argument('--num_matrices', type=int, required=True, help='Number of valuation matrices to generate')
-    parser.add_argument('--output', type=str, required=True, help='Output .npz filename')
+    parser.add_argument('--output', type=str, required=False, help='Output .npz file to save the dataset, default: dataset_<agents>_<items>_<num_matrices>_dataset.npz')
 
     args = parser.parse_args()
+
+    if not args.output:
+        args.output = f"datasets/{args.agents}_{args.items}_{args.num_matrices}_dataset.npz"
 
     if not args.output.endswith('.npz'):
         args.output += '.npz'
