@@ -15,7 +15,7 @@ For evaluating allocation algorithms at scale with precomputed optimal welfare v
 ### 1. Generate Dataset
 
 ```bash
-uv run python generate_dataset.py --agents 10 --items 14 --num_matrices 100000 --output dataset.npz
+uv run python generate_dataset.py --agents 10 --items 14 --num_matrices 100000
 ```
 
 **Arguments:**
@@ -23,13 +23,15 @@ uv run python generate_dataset.py --agents 10 --items 14 --num_matrices 100000 -
 - `--agents`: Number of agents (default: 10)
 - `--items`: Number of items (default: 14)
 - `--num_matrices`: Number of valuation matrices to generate (required)
-- `--output`: Output .npz filename (required) Use the following format to use the rest of scripts:` {agents}_{items}_{number of valuation matrices}_dataset.npz`
+- `--output`: Output .npz filename (optional) Default naming (and must be used to work well with other scripts):` {agents}_{items}_{number of valuation matrices}_dataset.npz`
 
 **Output:** Compressed numpy archive containing:
 
 - `matrices`: Valuation matrices (shape: `num_matrices × agents × items`)
 - `nash_welfare`: Precomputed optimal Nash welfare values (shape: `num_matrices`)
 - `util_welfare`: Precomputed optimal utilitarian welfare values (shape: `num_matrices`)
+- Timing statistics for generating the dataset save to a csv file with the same name as root of the .npz
+- Timing statistics summary saved to a txt file with the same name as root of the .npz
 
 ### 2. Run Evaluation
 
@@ -41,8 +43,9 @@ uv run python evaluation.py dataset.npz --batch_size 100 --eval_type random --ou
 
 - `--data_file`: .npz file of dataset
 - `--batch_size`: Number of allocations and inference to run in parallel, assumes the model can do parallel inference (default = 100)
-- `--eval_type`: Inference allocations from random, rr (round robin), or model(required)
+- `--eval_type`: Inference allocations from random, rr (round robin), or model (default = random). If using model must provide a config file
 - `--output`: Output .csv filename (default uses the input dataset name to parse data)
+- `--model_config`: Config file if model is selected as eval_type
 
 **Process:** For each valuation matrix in the dataset:
 
@@ -59,10 +62,47 @@ uv run python evaluation.py dataset.npz --batch_size 100 --eval_type random --ou
 - `envy_free`, `ef1`, `efx` (fairness properties)
 - `utility_sum`, `nash_welfare` (current allocation welfare)
 - `fraction_util_welfare`, `fraction_nash_welfare` (efficiency ratios)
-- 
+- `inference_time`
 
 ### 3. Auto Run Evaluation
 
+
+```bash
+uv run python auto_run_evals.py datasets/ --num_agents_list 10 --num_items_list 10 11 19 20 --num_matrices_list 1000 100000 --batch_size 100 --eval_type model --model_config sample_config.json
+```
+
+**Arguments:**
+
+- `--data_folder`: Folder containing .npz dataset files
+- `--num_agents_list`: List of agent counts to filter datasets
+- `--num_items_list`: List of item counts to filter datasets
+- `--num_matrices_list`: List of matrix counts to filter datasets
+- `--batch_size`: Number of allocations and inference to run in parallel, assumes the model can do parallel inference (default = 100)
+- `--eval_type`: Inference allocations from random, rr (round robin), or model (default = random)
+- `--model_config`: Config file if model is selected as eval_type
+
+**Model Config Example:**
+
+```json
+{
+    "model_name": "model0",
+    "model_weight_path": "../fatransformer/fatransformer_model_20_10-new.pt",
+    "model_def_path": "../fatransformer/fatransformer.py",
+    "model_class_def": "FATransformer",
+    "n": 10,
+    "m": 20,
+    "d_model": 768,
+    "num_heads": 12,
+    "dropout": 0.0,
+    "lr": 1e-4,
+    "weight_decay": 1e-2,
+    "steps": 20000,
+    "batch_size": 512,
+    "num_output_layers": 4,
+    "initial_temperature": 1.0,
+    "final_temperature": 0.01
+}
+```
 ### 4. Get full summaries
 
   **Usage:**
