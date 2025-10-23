@@ -15,15 +15,24 @@ For evaluating allocation algorithms at scale with precomputed optimal welfare v
 ### 1. Generate Dataset
 
 ```bash
+# Single combination
 uv run python generate_dataset.py --agents 10 --items 14 --num_matrices 100000
+
+# Multiple combinations stored in datasets/
+uv run python generate_dataset.py --agents 10 12 --items 14 16 --num_matrices 100000 --output datasets/
+
+# Pairwise mode (10 agents/14 items and 12 agents/16 items)
+uv run python generate_dataset.py --agents 10 12 --items 14 16 --num_matrices 100000 --pairwise
 ```
 
 **Arguments:**
 
-- `--agents`: Number of agents (default: 10)
-- `--items`: Number of items (default: 14)
+- `--agents`: One or more agent counts (default: 10)
+- `--items`: One or more item counts (default: 14)
 - `--num_matrices`: Number of valuation matrices to generate (required)
-- `--output`: Output .npz filename (optional) Default naming (and must be used to work well with other scripts):` {agents}_{items}_{number of valuation matrices}_dataset.npz`
+- `--output`: Output .npz filename when generating a single dataset, or directory when generating multiple datasets (optional). Default naming: `{agents}_{items}_{number of valuation matrices}_dataset.npz`
+- `--seed`: Base random seed used to initialise NumPy (default: 10)
+- `--pairwise`: Pair each entry from `--agents` with the corresponding entry from `--items` instead of generating every combination
 
 **Output:** Compressed numpy archive containing:
 

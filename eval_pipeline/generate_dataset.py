@@ -1,4 +1,5 @@
 import argparse
+import itertools
 import time
 from pathlib import Path
 
@@ -111,24 +112,71 @@ def generate_dataset(n_agents, n_items, num_matrices, output_file, seed=10):
         f.write(f"Average utilitarian welfare calculation time: {avg_util_time:.2f}ms\n")
         f.write(f"Average total time per matrix: {(avg_generation_time + avg_nash_time + avg_util_time):.2f}ms\n")
 
-    
+
+
+def generate_datasets(agent_counts, item_counts, num_matrices, output_dir, seed=10, pairwise=False):
+    """Generate datasets for multiple (agents, items) combinations."""
+
+    if not agent_counts:
+        raise ValueError("agent_counts must contain at least one value")
+
+    if not item_counts:
+        raise ValueError("item_counts must contain at least one value")
+
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    if pairwise:
+        if len(agent_counts) != len(item_counts):
+            raise ValueError("When pairwise=True, agent_counts and item_counts must have the same length")
+        combinations = list(zip(agent_counts, item_counts))
+    else:
+        combinations = list(itertools.product(agent_counts, item_counts))
+
+    total = len(combinations)
+
+    for index, (n_agents, n_items) in enumerate(combinations, start=1):
+        print(f"\n====== Dataset {index}/{total}: {n_agents} agents, {n_items} items ======")
+        output_file = output_dir / f"{n_agents}_{n_items}_{num_matrices}_dataset.npz"
+        generate_dataset(n_agents, n_items, num_matrices, output_file, seed=seed)
+
 
 def main():
     parser = argparse.ArgumentParser(description='Generate dataset of valuation matrices with precomputed max welfare')
-    parser.add_argument('--agents', type=int, default=10, help='Number of agents (default: 10)')
-    parser.add_argument('--items', type=int, default=14, help='Number of items (default: 14)')
+    parser.add_argument('--agents', type=int, nargs='+', default=[10], help='One or more agent counts (default: 10)')
+    parser.add_argument('--items', type=int, nargs='+', default=[14], help='One or more item counts (default: 14)')
     parser.add_argument('--num_matrices', type=int, required=True, help='Number of valuation matrices to generate')
-    parser.add_argument('--output', type=str, required=False, help='Output .npz file to save the dataset, default: dataset_<agents>_<items>_<num_matrices>_dataset.npz')
+    parser.add_argument('--output', type=str, required=False, help='Output .npz file (single dataset) or directory (multiple datasets). Default naming uses datasets/<agents>_<items>_<num_matrices>_dataset.npz')
+    parser.add_argument('--seed', type=int, default=10, help='Base random seed (default: 10)')
+    parser.add_argument('--pairwise', action='store_true', help='Pair each agents/items entry instead of generating every combination')
 
     args = parser.parse_args()
 
-    if not args.output:
-        args.output = f"datasets/{args.agents}_{args.items}_{args.num_matrices}_dataset.npz"
+    if args.pairwise and len(args.agents) != len(args.items):
+        parser.error('When using --pairwise, provide the same number of --agents and --items values.')
 
-    if not args.output.endswith('.npz'):
-        args.output += '.npz'
+    if args.pairwise:
+        total_combinations = len(args.agents)
+    else:
+        total_combinations = len(args.agents) * len(args.items)
 
-    generate_dataset(args.agents, args.items, args.num_matrices, args.output)
+    if total_combinations == 1:
+        n_agents = args.agents[0]
+        n_items = args.items[0]
+        output_path = args.output or f"datasets/{n_agents}_{n_items}_{args.num_matrices}_dataset.npz"
+
+        if not output_path.endswith('.npz'):
+            output_path += '.npz'
+
+        generate_dataset(n_agents, n_items, args.num_matrices, output_path, seed=args.seed)
+    else:
+        output_dir = args.output or 'datasets'
+        output_dir_path = Path(output_dir)
+
+        if output_dir_path.suffix == '.npz':
+            parser.error('Provide a directory for --output when generating multiple datasets.')
+
+        generate_datasets(args.agents, args.items, args.num_matrices, output_dir_path, seed=args.seed, pairwise=args.pairwise)
 
 if __name__ == "__main__":
     main()
