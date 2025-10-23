@@ -58,6 +58,9 @@ def create_summary_table(file_data, agent_item_pairs, inference_types):
                 util_sd = df['fraction_util_welfare'].std()
                 nash_frac = df['fraction_nash_welfare'].mean()
                 nash_sd = df['fraction_nash_welfare'].std()
+                inference_time = df['inference_time'].mean()
+                inference_sd = df['inference_time'].std()
+                batch_size = df['batch_size']
 
                 row_data[f'{inference}_EF'] = f"{ef_pct:.3f}%"
                 row_data[f'{inference}_EF_SD'] = f"{ef_sd:.3f}%"

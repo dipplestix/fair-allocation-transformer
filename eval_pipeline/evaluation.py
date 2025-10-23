@@ -5,8 +5,8 @@ from tqdm import tqdm
 from utils.calculations import calculate_agent_bundle_values, is_envy_free, is_ef1, is_efx, utility_sum, nash_welfare
 from utils.calculations import calculate_agent_bundle_values_batch, is_envy_free_batch, utility_sum_batch, nash_welfare_batch, is_ef1_batch, is_efx_batch
 from utils.inference import get_model_allocations_batch, get_random_allocations_batch, get_rr_allocations_batch, get_rr_allocations_batch_old
-from load_model import load_model
-
+from utils.load_model import load_model
+import time
 
 def evaluate_single_allocation(valuation_matrix, allocation_matrix, max_nash_welfare, max_util_welfare):
     """Evaluate a single allocation with precomputed max welfare values"""
@@ -60,7 +60,7 @@ def evaluate_batch_allocations(valuation_matrices, allocation_matrices, max_nash
     return results_tensors
 
 
-def run_evaluation(data_file, output_csv, output_npz, batch_size=100, eval_type='model'):
+def run_evaluation(data_file, output_csv, output_npz, batch_size=100, eval_type='random', model_config=None):
     """Run evaluation on all matrices in the dataset"""
     print(f"Loading dataset from {data_file}...")
     data = np.load(data_file)
@@ -75,13 +75,17 @@ def run_evaluation(data_file, output_csv, output_npz, batch_size=100, eval_type=
     print(f"Dataset loaded: {len(matrices)} matrices")
     print(f"Matrix shape: {matrices[0].shape}")
 
-    if eval_type.startswith('model'):
-        print(f"Loading model {eval_type}...")
-        model = load_model(eval_type)
-        print(f"Model {eval_type} loaded.")
+    if eval_type == 'model':
+        print(f"Loading model for config file: {model_config}...")
+        model, model_name = load_model(model_config)
+        print(f"Model {model_config} loaded.")
 
-    output_csv = "results/" + output_csv + "_" + data_file[0] + "_" + data_file[1] + "_" + data_file[2] + "_" + eval_type + ".csv"
-    output_npz = "results/" + output_npz + "_" + data_file[0] + "_" + data_file[1] + "_" + data_file[2] + "_" + eval_type + ".npz"
+        output_csv = "results/" + output_csv + "_" + data_file[0] + "_" + data_file[1] + "_" + data_file[2] + "_" + model_name + ".csv"
+        output_npz = "results/" + output_npz + "_" + data_file[0] + "_" + data_file[1] + "_" + data_file[2] + "_" + model_name + ".npz"
+    else:
+        output_csv = "results/" + output_csv + "_" + data_file[0] + "_" + data_file[1] + "_" + data_file[2] + "_" + eval_type + ".csv"
+        output_npz = "results/" + output_npz + "_" + data_file[0] + "_" + data_file[1] + "_" + data_file[2] + "_" + eval_type + ".npz"
+
 
     all_results = []
     all_valuations = []
@@ -90,7 +94,6 @@ def run_evaluation(data_file, output_csv, output_npz, batch_size=100, eval_type=
     all_utilities = []
     all_max_utilities = []
     all_fractions = []
-
     print("Running evaluations...")
     for i in tqdm(range(0, len(matrices), batch_size), desc="Evaluating matrices"):
 
@@ -99,7 +102,7 @@ def run_evaluation(data_file, output_csv, output_npz, batch_size=100, eval_type=
         batch_matrices = matrices[i:batch_end]
         batch_nash_max = nash_welfare_max[i:batch_end]
         batch_util_max = util_welfare_max[i:batch_end]
-
+        start_time = time.perf_counter()
         if eval_type.startswith('model'):
             # Get model allocations for the batch
             batch_allocations = get_model_allocations_batch(model, batch_matrices)
@@ -116,7 +119,7 @@ def run_evaluation(data_file, output_csv, output_npz, batch_size=100, eval_type=
             batch_nash_max = np.repeat(batch_nash_max, 5)
             batch_util_max = np.repeat(batch_util_max, 5)
             batch_matrices = np.repeat(batch_matrices, 5, axis=0)
-
+        end_time = time.perf_counter()
         # Evaluate the allocation
         results_tensors = evaluate_batch_allocations(batch_matrices, batch_allocations, batch_nash_max, batch_util_max)
 
@@ -153,8 +156,11 @@ def run_evaluation(data_file, output_csv, output_npz, batch_size=100, eval_type=
                 'utility_sum': float(result_tensor[j, 3]),
                 'nash_welfare': float(result_tensor[j, 4]),
                 'fraction_util_welfare': float(result_tensor[j, 3]) / util_max if util_max > 0 else 0,
-                'fraction_nash_welfare': float(result_tensor[j, 4]) / nash_max if nash_max > 0 else 0
+                'fraction_nash_welfare': float(result_tensor[j, 4]) / nash_max if nash_max > 0 else 0,
+                'inference_time': end_time - start_time,
+                'batch_size': batch_size
             }
+            
             all_results.append(result_dict)
 
         # Store data for NPZ file
@@ -172,8 +178,8 @@ def run_evaluation(data_file, output_csv, output_npz, batch_size=100, eval_type=
     columns = ['matrix_id', 'num_agents', 'num_items', 'max_nash_welfare', 'max_util_welfare',
                'envy_free', 'ef1', 'efx',
                'utility_sum', 'nash_welfare',
-               'fraction_util_welfare', 'fraction_nash_welfare']
-
+               'fraction_util_welfare', 'fraction_nash_welfare', 
+               'inference_time', 'batch_size']
     df = df[columns]
     df.to_csv(output_csv, index=False)
 
@@ -198,6 +204,7 @@ def run_evaluation(data_file, output_csv, output_npz, batch_size=100, eval_type=
     print(f"EFx allocations: {df['efx'].sum()} ({df['efx'].mean()*100:.1f}%)")
     print(f"Average fraction of best utility: {df['fraction_util_welfare'].mean():.3f}")
     print(f"Average fraction of best Nash welfare: {df['fraction_nash_welfare'].mean():.3f}")
+    print(f"Average inference time per batch: {np.mean(df['inference_time']):.4f} seconds (for batch size {batch_size})")
 
 def main():
     parser = argparse.ArgumentParser(description='Evaluate model allocations on precomputed dataset')
@@ -205,15 +212,19 @@ def main():
     parser.add_argument('--output_csv', default='evaluation_results', help='Output CSV filename')
     parser.add_argument('--output_npz', default='evaluation_results', help='Output NPZ filename')
     parser.add_argument('--batch_size', type=int, default=100, help='Batch size for processing (default: 100)')
-    parser.add_argument('--eval_type', default='model0', help='Type of evaluation: model[#n], random, or round robin (rr) (default: model0)')
-
+    parser.add_argument('--eval_type', default='random', help='Type of evaluation: model, random, or round robin (rr) (default: random)')
+    parser.add_argument('--model_config', type=str, default=None, help='Path to model config file (required if eval_type is model)')
     args = parser.parse_args()
 
     if not args.data_file.endswith('.npz'):
         print("Error: Input file must be a .npz file")
         return
+    
+    if args.eval_type == 'model' and args.model_config is None:
+        print("Error: --model_config must be provided when --eval_type is 'model'")
+        return
 
-    run_evaluation(args.data_file, args.output_csv, args.output_npz, args.batch_size, args.eval_type)
+    run_evaluation(args.data_file, args.output_csv, args.output_npz, args.batch_size, args.eval_type, args.model_config)
 
 if __name__ == "__main__":
     main()
