@@ -76,6 +76,14 @@ def generate_dataset(n_agents, n_items, num_matrices, output_file, seed=10):
         util_welfare=np.array(util_values), # shape: (num_matrices,)
     )
 
+    # save timing data to csv
+    timing_output_file = output_file.replace('.npz', '_timing.csv')
+    print(f"Saving timing data to {timing_output_file}...")
+    with open(timing_output_file, 'w') as f:
+        f.write("matrix_index,generation_time_ms,nash_time_ms,util_time_ms\n")
+        for i in range(num_matrices):
+            f.write(f"{i},{generation_times[i]:.4f},{nash_times[i]:.4f},{util_times[i]:.4f}\n")
+
     print(f"Dataset saved successfully!")
     print(f"Matrices shape: {np.array(matrices).shape}")
     print(f"Nash welfare shape: {np.array(nash_values).shape}")
