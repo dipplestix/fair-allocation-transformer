@@ -1,5 +1,7 @@
 # FairFormer: A Transformer for Discrete Fair Division
 
+![FairFormer mascot](ff.png)
+
 This repository contains the research code accompanying the working paper
 "FairFormer: A transformer architecture for discrete fair division". The model
 implements the two-tower, symmetry-aware transformer described in the draft
