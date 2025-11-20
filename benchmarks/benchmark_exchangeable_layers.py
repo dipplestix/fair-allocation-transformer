@@ -6,6 +6,8 @@ alternative 1x1 convolution based projection.  Both versions share the
 same pooling front-end so the benchmark isolates the cost of the
 projection step.
 
+For each method, we also print the total number of parameters in the layer.
+
 Usage example
 -------------
 Run the default benchmark on CPU::
@@ -110,13 +112,13 @@ class ExchangeableLayerConv1x1(nn.Module):
         self.activation = activation
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:  # pragma: no cover - benchmark utility
-        bsz, height, width, _ = x.shape
+        # Input is already in BCHW format
         x = self.pool_layer(x)
-        x = x.permute(0, 3, 1, 2).contiguous()  # B, C, H, W
         x = self.activation(self.proj(x))
-        x = x.permute(0, 2, 3, 1).contiguous()  # B, H, W, C
         return x
 
+def count_parameters(module: nn.Module) -> int:
+    return sum(p.numel() for p in module.parameters() if p.requires_grad)
 
 def make_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
@@ -186,7 +188,7 @@ def make_inputs(
     device: torch.device,
     dtype: torch.dtype,
 ) -> torch.Tensor:
-    return torch.randn(batch_size, height, width, channels, device=device, dtype=dtype)
+    return torch.randn(batch_size, channels, height, width, device=device, dtype=dtype)
 
 
 def _forward_no_grad(layer: nn.Module, x: torch.Tensor) -> None:
@@ -209,6 +211,11 @@ def benchmark_layers(config: BenchmarkConfig) -> Iterable[benchmark.Measurement]
 
     linear_layer.eval()
     conv_layer.eval()
+
+    # Print parameter counts for each layer
+    print(f"Linear projection total parameters: {count_parameters(linear_layer):,}")
+    print(f"1x1 convolution total parameters: {count_parameters(conv_layer):,}")
+    print("")
 
     for height, width in config.spatial_sizes:
         x = make_inputs(config.batch_size, height, width, config.in_channels, config.device, config.dtype)
