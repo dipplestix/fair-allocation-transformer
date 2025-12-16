@@ -1,6 +1,7 @@
 # Wandb artifacts and logs
 wandb/
 .wandb/
+*.txt
 
 # Python
 __pycache__/
