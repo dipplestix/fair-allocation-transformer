@@ -1,0 +1,42 @@
+# Example configuration file for FATransformer production training
+# Copy and modify for your training runs
+
+# Model architecture
+n: 10                    # Number of agents
+m: 20                    # Number of items
+d_model: 768             # Model dimension
+num_heads: 12            # Number of attention heads
+num_output_layers: 4     # Number of output transformer layers
+dropout: 0.0             # Dropout rate
+
+# Training hyperparameters
+lr: 0.0001               # Learning rate
+weight_decay: 0.01       # Weight decay (L2 regularization)
+batch_size: 512          # Batch size
+steps: 100000            # Total training steps
+
+# Temperature annealing
+initial_temperature: 1.0 # Starting softmax temperature (more uniform)
+final_temperature: 0.01  # Final softmax temperature (more discrete)
+
+# Training settings
+grad_clip_norm: 1.0      # Gradient clipping max norm
+seed: 42                 # Random seed for reproducibility
+
+# Checkpointing
+checkpoint_dir: "checkpoints/run_001"  # Directory to save checkpoints
+checkpoint_every: 5000                  # Save checkpoint every N steps
+keep_checkpoints: 3                     # Number of recent checkpoints to keep
+
+# Validation
+val_every: 1000          # Validate every N steps
+val_size: 1000           # Number of validation examples
+
+# Early stopping
+patience: 50             # Early stopping patience (validation checks without improvement)
+min_delta: 0.00001       # Minimum improvement to count as progress
+
+# Wandb logging
+wandb_project: "fa-transformer-production"
+run_name: "production_run_001"
+# wandb_entity: "your-entity"  # Uncomment and set if needed

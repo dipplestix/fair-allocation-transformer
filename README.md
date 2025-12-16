@@ -273,9 +273,40 @@ W&B dashboard shows:
 - Learning rate schedule (cosine annealing)
 - Early stopping triggers
 
+### Production Training
+
+After identifying best hyperparameters from the sweep, run production training with the dedicated training script:
+
+```bash
+# Option 1: Use config file
+python training/train.py --config configs/best_config.yaml
+
+# Option 2: Specify parameters via CLI
+python training/train.py \
+    --n 10 --m 20 \
+    --d-model 768 --num-heads 12 --num-output-layers 4 \
+    --lr 0.0001 --weight-decay 0.01 \
+    --steps 100000
+
+# Resume from checkpoint
+python training/train.py --resume checkpoints/checkpoint_50000.pt
+```
+
+**Key Features**:
+- Checkpoint saving every N steps (default: 5000)
+- Best model tracking based on validation metric
+- Resume training from checkpoints
+- Configurable early stopping
+- Full wandb integration
+
+**Config File Example** (`configs/example_config.yaml`):
+See `configs/example_config.yaml` for a complete configuration template with all parameters documented.
+
+Checkpoints are saved to `checkpoints/` directory by default. The best model is saved as `checkpoints/best_model.pt`.
+
 ### Manual Training
 
-For custom training loops, see `training/bayesian_sweep.py` `train()` function as template. For interactive experimentation, see notebooks in `notebooks/training/`.
+For custom training loops, see `training/train.py` or `training/bayesian_sweep.py` as templates. For interactive experimentation, see notebooks in `notebooks/training/`.
 
 ---
 

@@ -119,6 +119,7 @@ cython_debug/
 .vscode/
 
 # Model checkpoints and weights
+checkpoints/
 *.pt
 *.pth
 *.ckpt
