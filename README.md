@@ -1,6 +1,12 @@
 # FairFormer: A Transformer for Discrete Fair Division
 
-This repository contains the research code for **FairFormer**, a transformer-based neural architecture that learns to produce fair and efficient allocations for discrete fair division problems. The model implements a two-tower, symmetry-aware transformer design described in our working paper (in preparation for AAMAS 2026).
+![FairFormer mascot](ff.png)
+
+This repository contains the research code accompanying the working paper
+"FairFormer: A transformer architecture for discrete fair division". The model
+implements the two-tower, symmetry-aware transformer described in the draft
+AAMAS 2026 submission and provides utilities for computing Nash welfare during
+training.
 
 ## Table of Contents
 
