@@ -28,12 +28,15 @@ Get started in 5 minutes:
 # Clone and install
 git clone https://github.com/dipplestix/fair-allocation-transformer.git
 cd fair-allocation-transformer
-python -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-pip install -e .
+
+# Install uv if not already installed
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Install project (creates venv automatically)
+uv sync
 
 # Run a simple example
-python -c "
+uv run python -c "
 import torch
 from fatransformer import FATransformer, get_nash_welfare
 
@@ -134,16 +137,20 @@ This balances exploration (learning) with exploitation (discrete allocations).
 - PyTorch 2.1+
 - CUDA 12.x (optional, for GPU acceleration)
 
-### Method 1: pip install (recommended)
+### Method 1: uv (recommended)
+
+```bash
+# Install uv if not already installed
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Install project dependencies
+uv sync
+```
+
+### Method 2: pip install (alternative)
 
 ```bash
 pip install -e .
-```
-
-### Method 2: uv (fast dependency resolution)
-
-```bash
-uv sync
 ```
 
 ### Dependencies
@@ -159,7 +166,7 @@ Core dependencies (from `pyproject.toml`):
 ### Verify Installation
 
 ```bash
-python -c "from fatransformer import FATransformer; print('✓ Installation successful')"
+uv run python -c "from fatransformer import FATransformer; print('✓ Installation successful')"
 ```
 
 ---
@@ -567,9 +574,10 @@ fair-allocation-transformer/
 
 **Problem**: `ModuleNotFoundError: No module named 'fatransformer'`
 
-**Solution**: Install package in editable mode:
+**Solution**: Install package dependencies:
 ```bash
-pip install -e .
+uv sync
+# Or with pip: pip install -e .
 ```
 
 ### CUDA Out of Memory
