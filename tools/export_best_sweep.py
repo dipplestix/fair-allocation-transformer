@@ -72,15 +72,22 @@ def get_best_sweep_config(sweep_id: str, project: str, entity: str | None = None
     print(f"Run ID: {best_run.id}")
     print(f"Run URL: {best_run.url}")
 
-    # Get metrics
-    nash_welfare = best_run.summary.get('nash_welfare', 'N/A')
-    best_nash = best_run.summary.get('best_nash_welfare', nash_welfare)
+    # Get metrics - handle summary safely
+    try:
+        summary_dict = dict(best_run.summary)
+        nash_welfare = summary_dict.get('nash_welfare', 'N/A')
+        best_nash = summary_dict.get('best_nash_welfare', nash_welfare)
+        early_stop = summary_dict.get('early_stop_step')
+    except (TypeError, AttributeError):
+        # Fallback if summary doesn't work as expected
+        nash_welfare = 'N/A'
+        best_nash = 'N/A'
+        early_stop = None
 
-    print(f"Nash welfare: {nash_welfare}")
+    if nash_welfare != 'N/A':
+        print(f"Nash welfare: {nash_welfare}")
     if best_nash != 'N/A' and best_nash != nash_welfare:
         print(f"Best Nash welfare: {best_nash}")
-
-    early_stop = best_run.summary.get('early_stop_step')
     if early_stop:
         print(f"Early stopped at step: {early_stop}")
 
@@ -129,12 +136,17 @@ def get_best_sweep_config(sweep_id: str, project: str, entity: str | None = None
     }
 
     # Add metadata as comments (if YAML)
+    try:
+        best_nash_value = float(best_nash) if best_nash != 'N/A' else None
+    except (ValueError, TypeError):
+        best_nash_value = None
+
     metadata = {
         '_sweep_id': sweep_id,
         '_sweep_url': sweep.url,
         '_best_run_id': best_run.id,
         '_best_run_url': best_run.url,
-        '_best_nash_welfare': float(best_nash) if best_nash != 'N/A' else None,
+        '_best_nash_welfare': best_nash_value,
     }
 
     return config, metadata, best_run
