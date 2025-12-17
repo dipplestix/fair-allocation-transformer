@@ -307,13 +307,28 @@ def train(config: Dict[str, Any]):
             if val_nw > best_metric + config['min_delta']:
                 best_metric = val_nw
                 steps_without_improvement = 0
-                # Save best model
-                best_path = checkpoint_dir / "best_model.pt"
+
+                # Save best model as full checkpoint (for resuming training)
+                best_checkpoint_path = checkpoint_dir / "best_checkpoint.pt"
                 checkpoint_dir.mkdir(parents=True, exist_ok=True)
-                torch.save(model.state_dict(), best_path)
+                torch.save({
+                    'step': step,
+                    'model_state_dict': model.state_dict(),
+                    'optimizer_state_dict': optimizer.state_dict(),
+                    'scheduler_state_dict': scheduler.state_dict(),
+                    'config': config,
+                    'best_metric': best_metric,
+                    'rng_state': torch.get_rng_state(),
+                }, best_checkpoint_path)
+
+                # Also save just the model weights for easy inference
+                best_weights_path = checkpoint_dir / "best_model.pt"
+                torch.save(model.state_dict(), best_weights_path)
+
                 print(f"Step {step}: New best validation Nash welfare: {best_metric:.6f}")
                 if use_wandb:
-                    wandb.save(str(best_path))
+                    wandb.save(str(best_checkpoint_path))
+                    wandb.save(str(best_weights_path))
             else:
                 steps_without_improvement += 1
 
@@ -349,8 +364,9 @@ def train(config: Dict[str, Any]):
         config, best_metric, config['keep_checkpoints']
     )
 
-    print(f"Best validation Nash welfare: {best_metric:.6f}")
-    print(f"Best model saved to: {checkpoint_dir / 'best_model.pt'}")
+    print(f"\nBest validation Nash welfare: {best_metric:.6f}")
+    print(f"Best checkpoint (for resuming): {checkpoint_dir / 'best_checkpoint.pt'}")
+    print(f"Best model weights (for inference): {checkpoint_dir / 'best_model.pt'}")
 
     if use_wandb:
         wandb.finish()
