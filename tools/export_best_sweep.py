@@ -48,7 +48,40 @@ def get_run_metric(run, metric_name: str, default=None):
     Returns:
         Metric value or default
     """
-    # Primary approach: use the summary property
+    # Fallback 1: try summary_metrics as JSON string
+    try:
+        summary_metrics = getattr(run, 'summary_metrics', None)
+        if summary_metrics is not None:
+            if isinstance(summary_metrics, str):
+                # Parse JSON string
+                summary_dict = json.loads(summary_metrics)
+                result = summary_dict.get(metric_name)
+                if result is not None:
+                    return result
+            elif isinstance(summary_metrics, dict):
+                result = summary_metrics.get(metric_name)
+                if result is not None:
+                    return result
+    except (TypeError, AttributeError, json.JSONDecodeError):
+        pass
+
+    # Fallback 2: try internal _attrs['summaryMetrics']
+    try:
+        summary_data = getattr(run, '_attrs', {}).get('summaryMetrics', {})
+        if isinstance(summary_data, str):
+            # Parse JSON string
+            summary_dict = json.loads(summary_data)
+            result = summary_dict.get(metric_name)
+            if result is not None:
+                return result
+        elif isinstance(summary_data, dict):
+            result = summary_data.get(metric_name)
+            if result is not None:
+                return result
+    except (TypeError, AttributeError, json.JSONDecodeError):
+        pass
+
+    # Fallback 3: try the summary property (may trigger errors)
     try:
         summary = run.summary
         if summary is not None and hasattr(summary, 'get'):
@@ -56,27 +89,6 @@ def get_run_metric(run, metric_name: str, default=None):
             if result is not None:
                 return result
     except (TypeError, AttributeError, RuntimeError):
-        # Log but continue to fallbacks
-        pass
-
-    # Fallback 1: try summary_metrics attribute (direct dict access)
-    try:
-        summary_metrics = getattr(run, 'summary_metrics', None)
-        if summary_metrics is not None and isinstance(summary_metrics, dict):
-            result = summary_metrics.get(metric_name)
-            if result is not None:
-                return result
-    except (TypeError, AttributeError):
-        pass
-
-    # Fallback 2: try internal _attrs (last resort)
-    try:
-        summary_dict = getattr(run, '_attrs', {}).get('summaryMetrics', {})
-        if isinstance(summary_dict, dict):
-            result = summary_dict.get(metric_name)
-            if result is not None:
-                return result
-    except (TypeError, AttributeError):
         pass
 
     return default
@@ -97,28 +109,50 @@ def get_run_config_value(run, config_key: str, default=None):
     Returns:
         Config value or default
     """
-    # Primary approach: use the config attribute
+    # Fallback 1: try config attribute as JSON string
     try:
         config = run.config
-        if config is not None and hasattr(config, 'get'):
-            result = config.get(config_key)
-            if result is not None:
-                return result
-        elif config is not None and isinstance(config, dict):
-            result = config.get(config_key)
-            if result is not None:
-                return result
-    except (TypeError, AttributeError, RuntimeError):
+        if config is not None:
+            if isinstance(config, str):
+                # Parse JSON string
+                config_dict = json.loads(config)
+                # wandb config often wraps values in {"value": ...}
+                if config_key in config_dict:
+                    value = config_dict[config_key]
+                    # Extract from {"value": ...} wrapper if present
+                    if isinstance(value, dict) and 'value' in value:
+                        return value['value']
+                    return value
+            elif isinstance(config, dict):
+                result = config.get(config_key)
+                # Extract from {"value": ...} wrapper if present
+                if isinstance(result, dict) and 'value' in result:
+                    return result['value']
+                if result is not None:
+                    return result
+    except (TypeError, AttributeError, RuntimeError, json.JSONDecodeError):
         pass
 
-    # Fallback 1: try _attrs['config'] (internal access)
+    # Fallback 2: try _attrs['config']
     try:
-        config_dict = getattr(run, '_attrs', {}).get('config', {})
-        if isinstance(config_dict, dict):
-            result = config_dict.get(config_key)
+        config_data = getattr(run, '_attrs', {}).get('config', {})
+        if isinstance(config_data, str):
+            # Parse JSON string
+            config_dict = json.loads(config_data)
+            if config_key in config_dict:
+                value = config_dict[config_key]
+                # Extract from {"value": ...} wrapper if present
+                if isinstance(value, dict) and 'value' in value:
+                    return value['value']
+                return value
+        elif isinstance(config_data, dict):
+            result = config_data.get(config_key)
+            # Extract from {"value": ...} wrapper if present
+            if isinstance(result, dict) and 'value' in result:
+                return result['value']
             if result is not None:
                 return result
-    except (TypeError, AttributeError):
+    except (TypeError, AttributeError, json.JSONDecodeError):
         pass
 
     return default
@@ -211,8 +245,8 @@ def get_best_sweep_config(sweep_id: str, project: str, entity: str | None = None
         'val_size': 1000,
 
         # Early stopping
-        'patience': 50,
-        'min_delta': 1e-5,
+        'patience': get_run_config_value(best_run, 'patience', 50),
+        'min_delta': get_run_config_value(best_run, 'min_delta', 1e-5),
 
         # Wandb
         'wandb_project': 'fa-transformer-production',
