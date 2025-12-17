@@ -245,6 +245,23 @@ wandb agent <entity/project>/<sweep_id>
 python training/bayesian_sweep.py --run-agent --project my-fa-project
 ```
 
+### Extracting Best Configuration
+
+After your sweep completes, export the best configuration:
+
+```bash
+# Export best config from sweep
+python tools/export_best_sweep.py <sweep_id> --project fa-transformer-sweep
+
+# Example
+python tools/export_best_sweep.py abc123xyz --project fa-transformer-sweep --entity my-team
+```
+
+This creates `configs/best_from_sweep.yaml` with:
+- All hyperparameters from the best run
+- Increased steps to 100k for production
+- Ready to use with `train.py`
+
 ### Sweep Configuration
 
 The sweep (defined in `bayesian_sweep.py`) optimizes:
