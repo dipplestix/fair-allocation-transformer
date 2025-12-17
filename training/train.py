@@ -151,16 +151,40 @@ def load_checkpoint(checkpoint_path: str):
     return torch.load(checkpoint_path)
 
 
-def validate(model, n, m, val_size, device):
-    """Run validation on fixed validation set."""
-    model.eval()
+def validate(model, n, m, val_size, device, temperature=None):
+    """Run validation on fixed validation set.
+
+    Args:
+        model: The model to validate
+        n: Number of agents
+        m: Number of items
+        val_size: Validation set size
+        device: Device to run on
+        temperature: Temperature to use for validation. If None, uses current training temperature.
+    """
+    # Save current training state
+    was_training = model.training
+    current_temp = model.temperature
+
+    # Set to eval mode if specified temperature, otherwise keep in training mode
+    if temperature is not None:
+        model.eval()
+        model.temperature = temperature
+
     with torch.no_grad():
         val_valuations = torch.rand(val_size, n, m, device=device)
         val_allocations = model(val_valuations)
         val_nash_welfare = get_nash_welfare(
             val_valuations, val_allocations, reduction="mean"
         )
-    model.train()
+
+    # Restore original state
+    if was_training:
+        model.train()
+    else:
+        model.eval()
+    model.temperature = current_temp
+
     return val_nash_welfare.item()
 
 
