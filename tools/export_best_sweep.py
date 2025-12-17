@@ -33,6 +33,97 @@ except ImportError:
 import json
 
 
+def get_run_metric(run, metric_name: str, default=None):
+    """
+    Safely retrieve a metric from a wandb Run with multiple fallback strategies.
+
+    This function tries multiple approaches to access summary metrics to handle
+    cases where the wandb API returns data in unexpected formats.
+
+    Args:
+        run: wandb Run object from API
+        metric_name: Name of the metric to retrieve
+        default: Default value if metric not found
+
+    Returns:
+        Metric value or default
+    """
+    # Primary approach: use the summary property
+    try:
+        summary = run.summary
+        if summary is not None and hasattr(summary, 'get'):
+            result = summary.get(metric_name)
+            if result is not None:
+                return result
+    except (TypeError, AttributeError, RuntimeError):
+        # Log but continue to fallbacks
+        pass
+
+    # Fallback 1: try summary_metrics attribute (direct dict access)
+    try:
+        summary_metrics = getattr(run, 'summary_metrics', None)
+        if summary_metrics is not None and isinstance(summary_metrics, dict):
+            result = summary_metrics.get(metric_name)
+            if result is not None:
+                return result
+    except (TypeError, AttributeError):
+        pass
+
+    # Fallback 2: try internal _attrs (last resort)
+    try:
+        summary_dict = getattr(run, '_attrs', {}).get('summaryMetrics', {})
+        if isinstance(summary_dict, dict):
+            result = summary_dict.get(metric_name)
+            if result is not None:
+                return result
+    except (TypeError, AttributeError):
+        pass
+
+    return default
+
+
+def get_run_config_value(run, config_key: str, default=None):
+    """
+    Safely retrieve a config value from a wandb Run with multiple fallback strategies.
+
+    This function tries multiple approaches to access config values to handle
+    cases where the wandb API returns data in unexpected formats.
+
+    Args:
+        run: wandb Run object from API
+        config_key: Name of the config parameter to retrieve
+        default: Default value if config not found
+
+    Returns:
+        Config value or default
+    """
+    # Primary approach: use the config attribute
+    try:
+        config = run.config
+        if config is not None and hasattr(config, 'get'):
+            result = config.get(config_key)
+            if result is not None:
+                return result
+        elif config is not None and isinstance(config, dict):
+            result = config.get(config_key)
+            if result is not None:
+                return result
+    except (TypeError, AttributeError, RuntimeError):
+        pass
+
+    # Fallback 1: try _attrs['config'] (internal access)
+    try:
+        config_dict = getattr(run, '_attrs', {}).get('config', {})
+        if isinstance(config_dict, dict):
+            result = config_dict.get(config_key)
+            if result is not None:
+                return result
+    except (TypeError, AttributeError):
+        pass
+
+    return default
+
+
 def get_best_sweep_config(sweep_id: str, project: str, entity: str | None = None):
     """Get the best configuration from a wandb sweep."""
     api = wandb.Api()
@@ -72,10 +163,10 @@ def get_best_sweep_config(sweep_id: str, project: str, entity: str | None = None
     print(f"Run ID: {best_run.id}")
     print(f"Run URL: {best_run.url}")
 
-    # Get metrics - wandb objects are already dict-like
-    nash_welfare = best_run.summary.get('nash_welfare', 'N/A')
-    best_nash = best_run.summary.get('best_nash_welfare', nash_welfare)
-    early_stop = best_run.summary.get('early_stop_step')
+    # Get metrics - use defensive access with fallbacks
+    nash_welfare = get_run_metric(best_run, 'nash_welfare', 'N/A')
+    best_nash = get_run_metric(best_run, 'best_nash_welfare', nash_welfare)
+    early_stop = get_run_metric(best_run, 'early_stop_step')
 
     if nash_welfare != 'N/A':
         print(f"Nash welfare: {nash_welfare}")
@@ -86,31 +177,28 @@ def get_best_sweep_config(sweep_id: str, project: str, entity: str | None = None
 
     print(f"{'='*60}\n")
 
-    # Extract config - best_run.config is already dict-like
-    run_config = best_run.config
-
-    # Extract config
+    # Extract config - use defensive access with fallbacks
     config = {
         # Model architecture
-        'n': run_config.get('n', 10),
-        'm': run_config.get('m', 20),
-        'd_model': run_config.get('d_model', 768),
-        'num_heads': run_config.get('num_heads', 12),
-        'num_output_layers': run_config.get('num_output_layers', 4),
-        'dropout': run_config.get('dropout', 0.0),
+        'n': get_run_config_value(best_run, 'n', 10),
+        'm': get_run_config_value(best_run, 'm', 20),
+        'd_model': get_run_config_value(best_run, 'd_model', 768),
+        'num_heads': get_run_config_value(best_run, 'num_heads', 12),
+        'num_output_layers': get_run_config_value(best_run, 'num_output_layers', 4),
+        'dropout': get_run_config_value(best_run, 'dropout', 0.0),
 
         # Training hyperparameters
-        'lr': run_config.get('lr', 1e-4),
-        'weight_decay': run_config.get('weight_decay', 1e-2),
-        'batch_size': run_config.get('batch_size', 512),
+        'lr': get_run_config_value(best_run, 'lr', 1e-4),
+        'weight_decay': get_run_config_value(best_run, 'weight_decay', 1e-2),
+        'batch_size': get_run_config_value(best_run, 'batch_size', 512),
         'steps': 100000,  # Use longer for production (sweep uses 20k)
 
         # Temperature
-        'initial_temperature': run_config.get('initial_temperature', 1.0),
-        'final_temperature': run_config.get('final_temperature', 0.01),
+        'initial_temperature': get_run_config_value(best_run, 'initial_temperature', 1.0),
+        'final_temperature': get_run_config_value(best_run, 'final_temperature', 0.01),
 
         # Training settings
-        'grad_clip_norm': run_config.get('grad_clip_norm', 1.0),
+        'grad_clip_norm': get_run_config_value(best_run, 'grad_clip_norm', 1.0),
         'seed': 42,
 
         # Checkpointing
