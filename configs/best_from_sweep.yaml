@@ -1,0 +1,33 @@
+# Best configuration from wandb sweep
+# Sweep ID: n27zaqf9
+# Sweep URL: https://wandb.ai/dieplstks/bayes-sweep/sweeps/n27zaqf9
+# Best run: m56neg0j
+# Best run URL: https://wandb.ai/dieplstks/bayes-sweep/runs/m56neg0j
+# Best Nash welfare: 1.766840
+#
+# To train with this config:
+#   python training/train.py --config configs/best_from_sweep.yaml
+
+n: 10
+m: 20
+d_model: 768
+num_heads: 16
+num_output_layers: 5
+dropout: 0.008020981126192437
+lr: 0.00029231278959319056
+weight_decay: 0.02593215590525288
+batch_size: 2048
+steps: 100000
+initial_temperature: 1.6280636848525123
+final_temperature: 0.0017033255780648984
+grad_clip_norm: 1
+seed: 42
+checkpoint_dir: checkpoints/from_sweep_m56neg0j
+checkpoint_every: 5000
+keep_checkpoints: 3
+val_every: 1000
+val_size: 1000
+patience: 20
+min_delta: 1.0e-05
+wandb_project: fa-transformer-production
+run_name: production_from_sweep_m56neg0j

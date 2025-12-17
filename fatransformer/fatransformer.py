@@ -18,7 +18,8 @@ class FATransformer(nn.Module):
         self.initial_temperature = initial_temperature
         self.final_temperature = final_temperature
         self.temperature = initial_temperature
-        
+        self._training_temperature = initial_temperature  # Track current training temperature
+
         self.agent_proj = nn.Linear(m, d_model, bias=True)
         self.item_proj = nn.Linear(n, d_model, bias=True)
         self.output_proj = nn.Linear(d_model, n, bias=True)
@@ -35,7 +36,15 @@ class FATransformer(nn.Module):
     def update_temperature(self, temperature: float):
         """Update the temperature parameter for softmax scaling"""
         self.temperature = temperature
-        
+        self._training_temperature = temperature
+
+    def train(self, mode: bool = True):
+        """Set model to training mode and restore training temperature"""
+        super().train(mode)
+        if mode:
+            self.temperature = self._training_temperature
+        return self
+
     def eval(self):
         """Set model to evaluation mode and use final temperature"""
         super().eval()

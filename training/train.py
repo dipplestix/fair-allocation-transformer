@@ -233,6 +233,13 @@ def train(config: Dict[str, Any]):
     for step in range(start_step, config['steps']):
         model.train()
 
+        # Update temperature with cosine annealing (starts high, ends low)
+        progress = step / config['steps']
+        current_temp = config['final_temperature'] + \
+            (config['initial_temperature'] - config['final_temperature']) * \
+            (1 + torch.cos(torch.tensor(torch.pi * progress))) / 2
+        model.update_temperature(current_temp.item())
+
         # Generate batch
         valuations = torch.rand(
             config['batch_size'], config['n'], config['m'], device=device
@@ -261,6 +268,7 @@ def train(config: Dict[str, Any]):
             "loss": loss.item(),
             "nash_welfare": nash_welfare.item(),
             "lr": scheduler.get_last_lr()[0],
+            "temperature": current_temp.item(),
         }
 
         # Validation
