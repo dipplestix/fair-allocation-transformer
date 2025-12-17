@@ -33,6 +33,131 @@ except ImportError:
 import json
 
 
+def get_run_metric(run, metric_name: str, default=None):
+    """
+    Safely retrieve a metric from a wandb Run with multiple fallback strategies.
+
+    This function tries multiple approaches to access summary metrics to handle
+    cases where the wandb API returns data in unexpected formats.
+
+    Args:
+        run: wandb Run object from API
+        metric_name: Name of the metric to retrieve
+        default: Default value if metric not found
+
+    Returns:
+        Metric value or default
+    """
+    # Fallback 1: try summary_metrics as JSON string
+    try:
+        summary_metrics = getattr(run, 'summary_metrics', None)
+        if summary_metrics is not None:
+            if isinstance(summary_metrics, str):
+                # Parse JSON string
+                summary_dict = json.loads(summary_metrics)
+                result = summary_dict.get(metric_name)
+                if result is not None:
+                    return result
+            elif isinstance(summary_metrics, dict):
+                result = summary_metrics.get(metric_name)
+                if result is not None:
+                    return result
+    except (TypeError, AttributeError, json.JSONDecodeError):
+        pass
+
+    # Fallback 2: try internal _attrs['summaryMetrics']
+    try:
+        summary_data = getattr(run, '_attrs', {}).get('summaryMetrics', {})
+        if isinstance(summary_data, str):
+            # Parse JSON string
+            summary_dict = json.loads(summary_data)
+            result = summary_dict.get(metric_name)
+            if result is not None:
+                return result
+        elif isinstance(summary_data, dict):
+            result = summary_data.get(metric_name)
+            if result is not None:
+                return result
+    except (TypeError, AttributeError, json.JSONDecodeError):
+        pass
+
+    # Fallback 3: try the summary property (may trigger errors)
+    try:
+        summary = run.summary
+        if summary is not None and hasattr(summary, 'get'):
+            result = summary.get(metric_name)
+            if result is not None:
+                return result
+    except (TypeError, AttributeError, RuntimeError):
+        pass
+
+    return default
+
+
+def get_run_config_value(run, config_key: str, default=None):
+    """
+    Safely retrieve a config value from a wandb Run with multiple fallback strategies.
+
+    This function tries multiple approaches to access config values to handle
+    cases where the wandb API returns data in unexpected formats.
+
+    Args:
+        run: wandb Run object from API
+        config_key: Name of the config parameter to retrieve
+        default: Default value if config not found
+
+    Returns:
+        Config value or default
+    """
+    # Fallback 1: try config attribute as JSON string
+    try:
+        config = run.config
+        if config is not None:
+            if isinstance(config, str):
+                # Parse JSON string
+                config_dict = json.loads(config)
+                # wandb config often wraps values in {"value": ...}
+                if config_key in config_dict:
+                    value = config_dict[config_key]
+                    # Extract from {"value": ...} wrapper if present
+                    if isinstance(value, dict) and 'value' in value:
+                        return value['value']
+                    return value
+            elif isinstance(config, dict):
+                result = config.get(config_key)
+                # Extract from {"value": ...} wrapper if present
+                if isinstance(result, dict) and 'value' in result:
+                    return result['value']
+                if result is not None:
+                    return result
+    except (TypeError, AttributeError, RuntimeError, json.JSONDecodeError):
+        pass
+
+    # Fallback 2: try _attrs['config']
+    try:
+        config_data = getattr(run, '_attrs', {}).get('config', {})
+        if isinstance(config_data, str):
+            # Parse JSON string
+            config_dict = json.loads(config_data)
+            if config_key in config_dict:
+                value = config_dict[config_key]
+                # Extract from {"value": ...} wrapper if present
+                if isinstance(value, dict) and 'value' in value:
+                    return value['value']
+                return value
+        elif isinstance(config_data, dict):
+            result = config_data.get(config_key)
+            # Extract from {"value": ...} wrapper if present
+            if isinstance(result, dict) and 'value' in result:
+                return result['value']
+            if result is not None:
+                return result
+    except (TypeError, AttributeError, json.JSONDecodeError):
+        pass
+
+    return default
+
+
 def get_best_sweep_config(sweep_id: str, project: str, entity: str | None = None):
     """Get the best configuration from a wandb sweep."""
     api = wandb.Api()
@@ -72,42 +197,42 @@ def get_best_sweep_config(sweep_id: str, project: str, entity: str | None = None
     print(f"Run ID: {best_run.id}")
     print(f"Run URL: {best_run.url}")
 
-    # Get metrics
-    nash_welfare = best_run.summary.get('nash_welfare', 'N/A')
-    best_nash = best_run.summary.get('best_nash_welfare', nash_welfare)
+    # Get metrics - use defensive access with fallbacks
+    nash_welfare = get_run_metric(best_run, 'nash_welfare', 'N/A')
+    best_nash = get_run_metric(best_run, 'best_nash_welfare', nash_welfare)
+    early_stop = get_run_metric(best_run, 'early_stop_step')
 
-    print(f"Nash welfare: {nash_welfare}")
+    if nash_welfare != 'N/A':
+        print(f"Nash welfare: {nash_welfare}")
     if best_nash != 'N/A' and best_nash != nash_welfare:
         print(f"Best Nash welfare: {best_nash}")
-
-    early_stop = best_run.summary.get('early_stop_step')
     if early_stop:
         print(f"Early stopped at step: {early_stop}")
 
     print(f"{'='*60}\n")
 
-    # Extract config
+    # Extract config - use defensive access with fallbacks
     config = {
         # Model architecture
-        'n': best_run.config.get('n', 10),
-        'm': best_run.config.get('m', 20),
-        'd_model': best_run.config.get('d_model', 768),
-        'num_heads': best_run.config.get('num_heads', 12),
-        'num_output_layers': best_run.config.get('num_output_layers', 4),
-        'dropout': best_run.config.get('dropout', 0.0),
+        'n': get_run_config_value(best_run, 'n', 10),
+        'm': get_run_config_value(best_run, 'm', 20),
+        'd_model': get_run_config_value(best_run, 'd_model', 768),
+        'num_heads': get_run_config_value(best_run, 'num_heads', 12),
+        'num_output_layers': get_run_config_value(best_run, 'num_output_layers', 4),
+        'dropout': get_run_config_value(best_run, 'dropout', 0.0),
 
         # Training hyperparameters
-        'lr': best_run.config.get('lr', 1e-4),
-        'weight_decay': best_run.config.get('weight_decay', 1e-2),
-        'batch_size': best_run.config.get('batch_size', 512),
+        'lr': get_run_config_value(best_run, 'lr', 1e-4),
+        'weight_decay': get_run_config_value(best_run, 'weight_decay', 1e-2),
+        'batch_size': get_run_config_value(best_run, 'batch_size', 512),
         'steps': 100000,  # Use longer for production (sweep uses 20k)
 
         # Temperature
-        'initial_temperature': best_run.config.get('initial_temperature', 1.0),
-        'final_temperature': best_run.config.get('final_temperature', 0.01),
+        'initial_temperature': get_run_config_value(best_run, 'initial_temperature', 1.0),
+        'final_temperature': get_run_config_value(best_run, 'final_temperature', 0.01),
 
         # Training settings
-        'grad_clip_norm': best_run.config.get('grad_clip_norm', 1.0),
+        'grad_clip_norm': get_run_config_value(best_run, 'grad_clip_norm', 1.0),
         'seed': 42,
 
         # Checkpointing
@@ -120,8 +245,8 @@ def get_best_sweep_config(sweep_id: str, project: str, entity: str | None = None
         'val_size': 1000,
 
         # Early stopping
-        'patience': 50,
-        'min_delta': 1e-5,
+        'patience': get_run_config_value(best_run, 'patience', 50),
+        'min_delta': get_run_config_value(best_run, 'min_delta', 1e-5),
 
         # Wandb
         'wandb_project': 'fa-transformer-production',
@@ -129,12 +254,17 @@ def get_best_sweep_config(sweep_id: str, project: str, entity: str | None = None
     }
 
     # Add metadata as comments (if YAML)
+    try:
+        best_nash_value = float(best_nash) if best_nash != 'N/A' else None
+    except (ValueError, TypeError):
+        best_nash_value = None
+
     metadata = {
         '_sweep_id': sweep_id,
         '_sweep_url': sweep.url,
         '_best_run_id': best_run.id,
         '_best_run_url': best_run.url,
-        '_best_nash_welfare': float(best_nash) if best_nash != 'N/A' else None,
+        '_best_nash_welfare': best_nash_value,
     }
 
     return config, metadata, best_run
