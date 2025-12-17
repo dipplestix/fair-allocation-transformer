@@ -6,16 +6,31 @@ import importlib.util
 import sys
 
 def load_helper_module(module_path, module_name):
-
+    # Add project root to sys.path for package imports
     module_dir = os.path.dirname(os.path.abspath(module_path))
-    if module_dir not in sys.path:
-        sys.path.insert(0, module_dir)
-        
-    spec = importlib.util.spec_from_file_location(module_name, module_path)
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[module_name] = module
-    spec.loader.exec_module(module)
-    return module
+    # Go up one directory to get project root (fatransformer/ -> project_root/)
+    project_root = os.path.dirname(module_dir)
+
+    if project_root not in sys.path:
+        sys.path.insert(0, project_root)
+
+    # Import as package module to support relative imports
+    # e.g., "fatransformer.fatransformer" instead of just the file
+    import importlib
+    try:
+        # Try to import as a package module first
+        package_name = os.path.basename(module_dir)
+        module_basename = os.path.splitext(os.path.basename(module_path))[0]
+        full_module_name = f"{package_name}.{module_basename}"
+        module = importlib.import_module(full_module_name)
+        return module
+    except ImportError:
+        # Fallback to file-based import
+        spec = importlib.util.spec_from_file_location(module_name, module_path)
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[module_name] = module
+        spec.loader.exec_module(module)
+        return module
 
 def load_model(model_config):
 
