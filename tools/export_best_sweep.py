@@ -93,28 +93,35 @@ def get_best_sweep_config(sweep_id: str, project: str, entity: str | None = None
 
     print(f"{'='*60}\n")
 
+    # Extract config - handle config safely
+    try:
+        run_config = dict(best_run.config)
+    except (TypeError, AttributeError):
+        print("Warning: Could not access run config. Using defaults.")
+        run_config = {}
+
     # Extract config
     config = {
         # Model architecture
-        'n': best_run.config.get('n', 10),
-        'm': best_run.config.get('m', 20),
-        'd_model': best_run.config.get('d_model', 768),
-        'num_heads': best_run.config.get('num_heads', 12),
-        'num_output_layers': best_run.config.get('num_output_layers', 4),
-        'dropout': best_run.config.get('dropout', 0.0),
+        'n': run_config.get('n', 10),
+        'm': run_config.get('m', 20),
+        'd_model': run_config.get('d_model', 768),
+        'num_heads': run_config.get('num_heads', 12),
+        'num_output_layers': run_config.get('num_output_layers', 4),
+        'dropout': run_config.get('dropout', 0.0),
 
         # Training hyperparameters
-        'lr': best_run.config.get('lr', 1e-4),
-        'weight_decay': best_run.config.get('weight_decay', 1e-2),
-        'batch_size': best_run.config.get('batch_size', 512),
+        'lr': run_config.get('lr', 1e-4),
+        'weight_decay': run_config.get('weight_decay', 1e-2),
+        'batch_size': run_config.get('batch_size', 512),
         'steps': 100000,  # Use longer for production (sweep uses 20k)
 
         # Temperature
-        'initial_temperature': best_run.config.get('initial_temperature', 1.0),
-        'final_temperature': best_run.config.get('final_temperature', 0.01),
+        'initial_temperature': run_config.get('initial_temperature', 1.0),
+        'final_temperature': run_config.get('final_temperature', 0.01),
 
         # Training settings
-        'grad_clip_norm': best_run.config.get('grad_clip_norm', 1.0),
+        'grad_clip_norm': run_config.get('grad_clip_norm', 1.0),
         'seed': 42,
 
         # Checkpointing
