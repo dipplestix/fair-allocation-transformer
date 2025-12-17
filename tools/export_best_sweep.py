@@ -72,17 +72,10 @@ def get_best_sweep_config(sweep_id: str, project: str, entity: str | None = None
     print(f"Run ID: {best_run.id}")
     print(f"Run URL: {best_run.url}")
 
-    # Get metrics - handle summary safely
-    try:
-        summary_dict = dict(best_run.summary)
-        nash_welfare = summary_dict.get('nash_welfare', 'N/A')
-        best_nash = summary_dict.get('best_nash_welfare', nash_welfare)
-        early_stop = summary_dict.get('early_stop_step')
-    except (TypeError, AttributeError):
-        # Fallback if summary doesn't work as expected
-        nash_welfare = 'N/A'
-        best_nash = 'N/A'
-        early_stop = None
+    # Get metrics - wandb objects are already dict-like
+    nash_welfare = best_run.summary.get('nash_welfare', 'N/A')
+    best_nash = best_run.summary.get('best_nash_welfare', nash_welfare)
+    early_stop = best_run.summary.get('early_stop_step')
 
     if nash_welfare != 'N/A':
         print(f"Nash welfare: {nash_welfare}")
@@ -93,12 +86,8 @@ def get_best_sweep_config(sweep_id: str, project: str, entity: str | None = None
 
     print(f"{'='*60}\n")
 
-    # Extract config - handle config safely
-    try:
-        run_config = dict(best_run.config)
-    except (TypeError, AttributeError):
-        print("Warning: Could not access run config. Using defaults.")
-        run_config = {}
+    # Extract config - best_run.config is already dict-like
+    run_config = best_run.config
 
     # Extract config
     config = {
