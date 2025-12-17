@@ -418,6 +418,157 @@ python auto_run_evals.py datasets/ \
   --model_config config.json
 ```
 
+### Batch Evaluation Scripts
+
+For comprehensive model evaluation across multiple dataset sizes and baselines, use the shell scripts:
+
+#### 1. Evaluate Model Across All Datasets
+
+```bash
+cd eval_pipeline
+./run_all_evaluations.sh
+```
+
+**What it does**:
+- Evaluates your trained model on datasets from `10_10` to `10_20` (10 agents, 10-20 items)
+- Uses `best_model_config.json` for model configuration
+- Batch size: 100 instances per batch
+- Saves results to `results/evaluation_results_10_{m}_100000_best_from_sweep_*.csv`
+
+**Customize**:
+- Edit the script to change dataset range (default: `m in {10..20}`)
+- Modify `--batch_size` for different processing batches
+- Update model config path if using different configuration
+
+#### 2. Evaluate Random Baseline
+
+```bash
+./run_random_baseline.sh
+```
+
+**What it does**:
+- Generates 5 random allocations per instance
+- Averages fairness and welfare metrics
+- Runs on same datasets (10-20 items)
+- Saves to `results/evaluation_results_10_{m}_100000_random.csv`
+
+#### 3. Evaluate Round-Robin Baseline
+
+```bash
+./run_rr_baseline.sh
+```
+
+**What it does**:
+- Implements greedy round-robin allocation (agents pick in order)
+- Each agent selects their most preferred available item
+- Guaranteed to satisfy EF1 property
+- Saves to `results/evaluation_results_10_{m}_100000_rr.csv`
+
+#### 4. Generate Comparison Summary
+
+After running evaluations, create comparison tables:
+
+```bash
+cd eval_pipeline
+uv run compare_results.py
+```
+
+**Output**:
+- Prints detailed comparison tables to console
+- Shows EF, EF1, EFx, Utility, and Nash Welfare percentages
+- Breaks down by dataset size (m=10 to m=20)
+- Saves summary to `results/comparison_summary.csv`
+
+**Example output**:
+```
+Dataset: 10_20 (n=10, m=20)
+Method             EF      EF1      EFx    Utility   Nash Welfare
+----------------------------------------------------------------
+Model            8.3%    70.8%    31.8%      97.9%          97.6%
+Random           0.0%     0.0%     0.0%      55.0%           9.2%
+RR               6.1%   100.0%    94.6%      92.8%          94.4%
+```
+
+#### 5. Create Performance Visualizations
+
+Generate plots comparing metrics across dataset sizes:
+
+```bash
+uv run analyze_and_plot.py
+```
+
+**Output**:
+- `results/comparison_plots.png`: 6-panel plot showing all metrics vs. number of items
+  - Envy-Free (EF) %
+  - EF1 %
+  - EFx %
+  - Utility Fraction %
+  - Nash Welfare Fraction %
+  - Average Runtime (ms)
+- `results/runtime_comparison.png`: Detailed runtime analysis
+
+**What the plots show**:
+- How each method performs as problem size increases (m=10 to m=20)
+- Model generalization from training distribution (m=20)
+- Speed vs. performance tradeoffs
+
+#### Complete Evaluation Workflow
+
+Run the full evaluation pipeline:
+
+```bash
+cd eval_pipeline
+
+# 1. Evaluate model
+./run_all_evaluations.sh
+
+# 2. Evaluate baselines (can run in parallel)
+./run_random_baseline.sh &
+./run_rr_baseline.sh &
+wait
+
+# 3. Generate comparison and plots
+uv run compare_results.py
+uv run analyze_and_plot.py
+
+# Results available in results/ directory
+ls -lh results/
+```
+
+**Expected runtime**:
+- Model evaluation: ~5-10 minutes (depends on GPU)
+- Random baseline: ~1 minute (very fast)
+- Round-robin baseline: ~3-5 minutes (greedy selection)
+- Analysis & plotting: <1 minute
+
+#### Script Configuration
+
+All scripts process datasets matching pattern `datasets/10_{m}_100000_dataset.npz`. To modify:
+
+**Change dataset range** (e.g., only m=15 to m=18):
+```bash
+# Edit the shell script
+for m in {15..18}; do
+    dataset="datasets/10_${m}_100000_dataset.npz"
+    ...
+done
+```
+
+**Change batch size**:
+```bash
+# In the shell scripts, modify:
+uv run eval_pipeline/evaluation.py "$dataset" \
+    --eval_type model \
+    --model_config eval_pipeline/best_model_config.json \
+    --batch_size 256  # Change from default 100
+```
+
+**Use different model config**:
+```bash
+# In run_all_evaluations.sh, change:
+--model_config eval_pipeline/my_custom_config.json
+```
+
 ---
 
 ## API Reference
