@@ -16,6 +16,10 @@ This directory contains Jupyter notebooks for experimentation and analysis.
 
 - **test_exchange.ipynb**: Experiments with exchangeable layer variants and permutation equivariance
 
+## Algorithm Examples
+
+- **ece_example.md**: Detailed walkthrough of the Envy-Cycle Elimination algorithm with 3 agents and 10 items, demonstrating how ECE achieves EF1 allocations step-by-step
+
 ## Usage
 
 These notebooks are for research and development. For production training, use:
