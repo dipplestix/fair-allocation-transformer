@@ -44,6 +44,14 @@ def main():
             model_summary['type'] = 'Model'
             data.append(model_summary)
 
+        # Model with swaps results
+        model_swap_files = list(results_dir.glob(f'evaluation_results_{dataset_pattern}_best_from_sweep_*_with_swaps.csv'))
+        if model_swap_files:
+            model_swap_summary = load_and_summarize(model_swap_files[0])
+            model_swap_summary['dataset'] = f'10_{m}'
+            model_swap_summary['type'] = 'Model+Swaps'
+            data.append(model_swap_summary)
+
         # Random baseline
         random_files = list(results_dir.glob(f'evaluation_results_{dataset_pattern}_random.csv'))
         if random_files:
@@ -104,7 +112,7 @@ def main():
 
     print(f"{'Method':<12} {'EF':>8} {'EF1':>8} {'EFx':>8} {'Utility':>10} {'Nash Welfare':>14}")
     print("-" * 120)
-    for method in ['Model', 'RR', 'ECE', 'Random']:
+    for method in ['Model', 'Model+Swaps', 'RR', 'ECE', 'Random']:
         if method in avg_by_type.index:
             row = avg_by_type.loc[method]
             print(f"{method:<12} {row['ef_pct']:>7.1f}% {row['ef1_pct']:>7.1f}% {row['efx_pct']:>7.1f}% "

@@ -11,8 +11,19 @@ def get_model_allocations(model, valuation_matrix):
     allocation_matrix = np.zeros_like(valuation_matrix)
     return allocation_matrix
 
-def get_model_allocations_batch(model, valuation_matrices):
-    """Get model allocations for a batch of valuation matrices"""
+def get_model_allocations_batch(model, valuation_matrices, apply_swap_refinement=False,
+                                swap_params=None):
+    """Get model allocations for a batch of valuation matrices with optional swap refinement
+
+    Args:
+        model: Trained FATransformer model
+        valuation_matrices: (N, n_agents, m_items) valuation matrices
+        apply_swap_refinement: Whether to apply post-processing swaps
+        swap_params: Dict of parameters for swap refinement
+
+    Returns:
+        allocation_matrices: (N, n_agents, m_items) binary allocation matrices
+    """
     N, n_agents, m_items = valuation_matrices.shape
     allocation_matrices = np.zeros((N, n_agents, m_items), dtype=int)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -32,7 +43,14 @@ def get_model_allocations_batch(model, valuation_matrices):
     # transpose to (N, n_agents, m_items)
     allocation_matrices = allocation_matrices.transpose(1, 2).cpu().numpy()
 
-    # Placeholder for batch model allocations
+    # Apply swap refinement if requested
+    if apply_swap_refinement:
+        from utils.swap_refinement import swap_based_refinement_batch
+        swap_params = swap_params or {}
+        allocation_matrices = swap_based_refinement_batch(
+            allocation_matrices, valuation_matrices, **swap_params
+        )
+
     return allocation_matrices
 
 def get_random_allocations(valuation_matrix):
