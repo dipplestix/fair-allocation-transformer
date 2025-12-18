@@ -252,12 +252,67 @@ def test_ef1_definition():
 
     print("\n✓ Test 5 passed!\n")
 
+def test_ece_allocation_validity():
+    """Test that ECE allocations are valid"""
+    print("Test 6: ECE allocation validity check")
+    print("="*60)
+
+    from utils.inference import get_ece_allocations_batch
+
+    np.random.seed(42)
+    N = 10
+    m, n = 10, 15
+
+    valuation_matrices = np.random.uniform(0, 1, (N, m, n))
+
+    ece_allocs = get_ece_allocations_batch(valuation_matrices)
+    print(f"ECE allocations shape: {ece_allocs.shape}")
+    print(f"Expected shape: ({N}, {m}, {n})")
+
+    for k in range(ece_allocs.shape[0]):
+        col_sums = np.sum(ece_allocs[k], axis=0)
+        assert np.all(col_sums == 1), \
+            f"ECE allocation {k} invalid: items not assigned to exactly one agent"
+    print("✓ All ECE allocations valid")
+
+    print("\n✓ Test 6 passed!\n")
+
+def test_ece_ef1_guarantee():
+    """Test that ECE produces EF1 allocations (theoretically guaranteed)"""
+    print("Test 7: ECE EF1 guarantee")
+    print("="*60)
+
+    from utils.inference import get_ece_allocation
+
+    np.random.seed(123)
+    # Test multiple random instances
+    for trial in range(20):
+        n_agents = np.random.randint(2, 8)
+        m_items = np.random.randint(n_agents, n_agents * 3)
+
+        valuation_matrix = np.random.uniform(0, 1, (n_agents, m_items))
+        allocation = get_ece_allocation(valuation_matrix)
+
+        # Check EF1
+        bundle_values = calculate_agent_bundle_values(valuation_matrix, allocation)
+        ef1_result = is_ef1(valuation_matrix, allocation, bundle_values)
+
+        if not ef1_result:
+            print(f"\nTrial {trial} FAILED:")
+            print(f"Agents: {n_agents}, Items: {m_items}")
+            assert False, "ECE should always produce EF1 allocations"
+
+    print(f"✓ All 20 trials produced EF1 allocations")
+    print("\n✓ Test 7 passed!\n")
+
 if __name__ == '__main__':
     test_simple_case()
     test_unfair_allocation()
     test_batch_operations()
     test_allocation_validity()
     test_ef1_definition()
+    test_ece_allocation_validity()
+    test_ece_ef1_guarantee()
 
     print("="*60)
     print("ALL TESTS PASSED! ✓")

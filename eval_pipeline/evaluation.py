@@ -4,7 +4,7 @@ import pandas as pd
 from tqdm import tqdm
 from utils.calculations import calculate_agent_bundle_values, is_envy_free, is_ef1, is_efx, utility_sum, nash_welfare
 from utils.calculations import calculate_agent_bundle_values_batch, is_envy_free_batch, utility_sum_batch, nash_welfare_batch, is_ef1_batch, is_efx_batch
-from utils.inference import get_model_allocations_batch, get_random_allocations_batch, get_rr_allocations_batch, get_rr_allocations_batch_old
+from utils.inference import get_model_allocations_batch, get_random_allocations_batch, get_rr_allocations_batch, get_rr_allocations_batch_old, get_ece_allocations_batch
 from utils.load_model import load_model
 import time
 
@@ -113,6 +113,9 @@ def run_evaluation(data_file, output_csv, output_npz, batch_size=100, eval_type=
             # batch_nash_max = np.repeat(batch_nash_max, 5)
             # batch_util_max = np.repeat(batch_util_max, 5)
             # batch_matrices = np.repeat(batch_matrices, 5, axis=0)
+        elif eval_type == 'ece':
+            batch_allocations = get_ece_allocations_batch(batch_matrices)
+            # ECE generates 1 allocation per matrix (like RR), no averaging needed
         else:  # random
             batch_allocations = get_random_allocations_batch(batch_matrices)
             # since we are generating 5 allocations per matrix for random and rr, we need to repeat the max values and valuation matrices
@@ -212,7 +215,7 @@ def main():
     parser.add_argument('--output_csv', default='evaluation_results', help='Output CSV filename')
     parser.add_argument('--output_npz', default='evaluation_results', help='Output NPZ filename')
     parser.add_argument('--batch_size', type=int, default=100, help='Batch size for processing (default: 100)')
-    parser.add_argument('--eval_type', default='random', help='Type of evaluation: model, random, or round robin (rr) (default: random)')
+    parser.add_argument('--eval_type', default='random', help='Type of evaluation: model, random, round robin (rr), or envy cycle elimination (ece) (default: random)')
     parser.add_argument('--model_config', type=str, default=None, help='Path to model config file (required if eval_type is model)')
     args = parser.parse_args()
 

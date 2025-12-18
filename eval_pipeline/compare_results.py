@@ -60,6 +60,14 @@ def main():
             rr_summary['type'] = 'RR'
             data.append(rr_summary)
 
+        # ECE baseline
+        ece_files = list(results_dir.glob(f'evaluation_results_{dataset_pattern}_ece.csv'))
+        if ece_files:
+            ece_summary = load_and_summarize(ece_files[0])
+            ece_summary['dataset'] = f'10_{m}'
+            ece_summary['type'] = 'ECE'
+            data.append(ece_summary)
+
     # Create comparison DataFrame
     df = pd.DataFrame(data)
 
@@ -96,7 +104,7 @@ def main():
 
     print(f"{'Method':<12} {'EF':>8} {'EF1':>8} {'EFx':>8} {'Utility':>10} {'Nash Welfare':>14}")
     print("-" * 120)
-    for method in ['Model', 'RR', 'Random']:
+    for method in ['Model', 'RR', 'ECE', 'Random']:
         if method in avg_by_type.index:
             row = avg_by_type.loc[method]
             print(f"{method:<12} {row['ef_pct']:>7.1f}% {row['ef1_pct']:>7.1f}% {row['efx_pct']:>7.1f}% "

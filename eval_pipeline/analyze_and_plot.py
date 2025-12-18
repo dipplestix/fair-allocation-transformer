@@ -68,6 +68,24 @@ def load_results():
             }
             data.append(summary)
 
+        # ECE baseline
+        ece_files = list(results_dir.glob(f'evaluation_results_{dataset_pattern}_ece.csv'))
+        if ece_files:
+            df = pd.read_csv(ece_files[0])
+            summary = {
+                'dataset': f'10_{m}',
+                'm': m,
+                'type': 'ECE',
+                'ef_pct': (df['envy_free'] == True).mean() * 100,
+                'ef1_pct': (df['ef1'] == True).mean() * 100,
+                'efx_pct': (df['efx'] == True).mean() * 100,
+                'utility_pct': df['fraction_util_welfare'].mean() * 100,
+                'nash_welfare_pct': df['fraction_nash_welfare'].mean() * 100,
+                'avg_time_ms': df['inference_time'].mean() * 1000,
+                'batch_size': df['batch_size'].iloc[0]
+            }
+            data.append(summary)
+
     return pd.DataFrame(data)
 
 def print_runtime_comparison(df):
@@ -102,7 +120,7 @@ def print_runtime_comparison(df):
 
     print(f"{'Method':<12} {'Avg Time (ms)':<18} {'Avg Batch Size':<16} {'Time per item (ms)':<20}")
     print("-" * 80)
-    for method in ['Model', 'RR', 'Random']:
+    for method in ['Model', 'RR', 'ECE', 'Random']:
         if method in avg_by_type.index:
             row = avg_by_type.loc[method]
             time_per_item = row['avg_time_ms'] / row['batch_size']
@@ -114,8 +132,8 @@ def create_plots(df):
     """Create comparison plots"""
     # Set up the plot style
     plt.style.use('seaborn-v0_8-darkgrid')
-    colors = {'Model': '#2E86AB', 'RR': '#A23B72', 'Random': '#F18F01'}
-    markers = {'Model': 'o', 'RR': 's', 'Random': '^'}
+    colors = {'Model': '#2E86AB', 'RR': '#A23B72', 'ECE': '#06A77D', 'Random': '#F18F01'}
+    markers = {'Model': 'o', 'RR': 's', 'ECE': 'D', 'Random': '^'}
 
     # Create figure with subplots
     fig, axes = plt.subplots(2, 3, figsize=(18, 12))
@@ -131,7 +149,7 @@ def create_plots(df):
     ]
 
     for metric, title, ax in metrics:
-        for method in ['Model', 'RR', 'Random']:
+        for method in ['Model', 'RR', 'ECE', 'Random']:
             method_data = df[df['type'] == method].sort_values('m')
             ax.plot(method_data['m'], method_data[metric],
                    label=method, color=colors[method], marker=markers[method],
@@ -161,7 +179,7 @@ def create_plots(df):
     fig2, ax2 = plt.subplots(figsize=(10, 6))
     fig2.suptitle('Runtime Comparison vs. Number of Items', fontsize=14, fontweight='bold')
 
-    for method in ['Model', 'RR', 'Random']:
+    for method in ['Model', 'RR', 'ECE', 'Random']:
         method_data = df[df['type'] == method].sort_values('m')
         ax2.plot(method_data['m'], method_data['avg_time_ms'],
                label=method, color=colors[method], marker=markers[method],

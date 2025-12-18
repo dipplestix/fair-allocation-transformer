@@ -148,3 +148,177 @@ def get_rr_allocations_batch_old(valuation_matrices, n_permutations=5):
                             break
 
     return allocation_matrices
+
+
+def build_envy_graph(valuation_matrix, agent_bundles):
+    """
+    Build directed envy graph where edge i->j means agent i envies agent j.
+
+    Args:
+        valuation_matrix: (n_agents, m_items) numpy array
+        agent_bundles: list of sets, agent_bundles[i] = set of items agent i has
+
+    Returns:
+        envy_graph: dict mapping agent -> list of agents they envy
+    """
+    n_agents = valuation_matrix.shape[0]
+
+    # Compute bundle values
+    bundle_values = {}
+    for i in range(n_agents):
+        bundle_values[i] = {}
+        for j in range(n_agents):
+            bundle_values[i][j] = sum(valuation_matrix[i][item]
+                                     for item in agent_bundles[j])
+
+    # Build envy graph
+    envy_graph = {i: [] for i in range(n_agents)}
+    for i in range(n_agents):
+        for j in range(n_agents):
+            if i != j and bundle_values[i][j] > bundle_values[i][i]:
+                envy_graph[i].append(j)
+
+    return envy_graph
+
+
+def detect_and_remove_cycle(envy_graph, agent_bundles):
+    """
+    Detect a cycle in the envy graph and remove it via cyclic bundle exchange.
+
+    Uses DFS to find a cycle, then rotates bundles along the cycle.
+
+    Args:
+        envy_graph: dict mapping agent -> list of envied agents
+        agent_bundles: list of sets (modified in place)
+
+    Returns:
+        bool: True if a cycle was found and removed, False if no cycle exists
+    """
+    n_agents = len(envy_graph)
+    visited = set()
+    rec_stack = set()
+
+    def dfs(node, path):
+        """DFS to find cycle. Returns cycle as list if found, None otherwise."""
+        if node in rec_stack:
+            # Found cycle - extract it
+            cycle_start = path.index(node)
+            return path[cycle_start:]
+
+        if node in visited:
+            return None
+
+        visited.add(node)
+        rec_stack.add(node)
+        path.append(node)
+
+        for neighbor in envy_graph[node]:
+            cycle = dfs(neighbor, path)
+            if cycle:
+                return cycle
+
+        rec_stack.remove(node)
+        path.pop()
+        return None
+
+    # Try to find a cycle starting from each node
+    for start_node in range(n_agents):
+        if start_node not in visited:
+            cycle = dfs(start_node, [])
+            if cycle:
+                # Remove cycle by rotating bundles
+                # If cycle is [a, b, c], then a gets b's bundle, b gets c's, c gets a's
+                temp_bundle = agent_bundles[cycle[0]].copy()
+                for i in range(len(cycle) - 1):
+                    agent_bundles[cycle[i]] = agent_bundles[cycle[i + 1]].copy()
+                agent_bundles[cycle[-1]] = temp_bundle
+
+                return True
+
+    return False
+
+
+def get_ece_allocation(valuation_matrix):
+    """
+    Envy Cycle Elimination algorithm for single valuation matrix.
+
+    Maintains EF1 property at every step by:
+    1. Assigning items in order (0, 1, 2, ..., m-1)
+    2. Detecting and removing envy cycles when needed
+    3. Giving each item to an unenvied agent
+
+    Args:
+        valuation_matrix: (n_agents, m_items) numpy array
+
+    Returns:
+        allocation_matrix: (n_agents, m_items) binary allocation (EF1 guaranteed)
+    """
+    n_agents, m_items = valuation_matrix.shape
+    allocation_matrix = np.zeros((n_agents, m_items), dtype=int)
+
+    # Initialize agent bundles (list of sets)
+    agent_bundles = [set() for _ in range(n_agents)]
+
+    # Process items in order (arbitrary ordering: 0, 1, 2, ..., m-1)
+    for item_idx in range(m_items):
+        # Build envy graph based on current allocations
+        envy_graph = build_envy_graph(valuation_matrix, agent_bundles)
+
+        # Find unenvied agents (nodes with no incoming edges)
+        envied_agents = set()
+        for agent, envies_list in envy_graph.items():
+            envied_agents.update(envies_list)
+
+        unenvied_agents = [i for i in range(n_agents) if i not in envied_agents]
+
+        # If no unenvied agent, remove cycles until one exists
+        while len(unenvied_agents) == 0:
+            cycle_removed = detect_and_remove_cycle(envy_graph, agent_bundles)
+            if not cycle_removed:
+                # Safety: shouldn't happen, but fallback to agent 0
+                unenvied_agents = [0]
+                break
+
+            # Update allocation matrix to reflect swapped bundles
+            allocation_matrix = np.zeros((n_agents, m_items), dtype=int)
+            for agent_idx, bundle in enumerate(agent_bundles):
+                for item in bundle:
+                    allocation_matrix[agent_idx][item] = 1
+
+            # Rebuild envy graph after cycle removal
+            envy_graph = build_envy_graph(valuation_matrix, agent_bundles)
+
+            # Recompute unenvied agents
+            envied_agents = set()
+            for agent, envies_list in envy_graph.items():
+                envied_agents.update(envies_list)
+            unenvied_agents = [i for i in range(n_agents) if i not in envied_agents]
+
+        # Pick an unenvied agent (tie-break by smallest index for determinism)
+        selected_agent = min(unenvied_agents)
+
+        # Allocate item to selected agent
+        allocation_matrix[selected_agent][item_idx] = 1
+        agent_bundles[selected_agent].add(item_idx)
+
+    return allocation_matrix
+
+
+def get_ece_allocations_batch(valuation_matrices):
+    """
+    Generate ECE allocations for a batch of valuation matrices.
+
+    Args:
+        valuation_matrices: (N, n_agents, m_items) numpy array
+
+    Returns:
+        allocation_matrices: (N, n_agents, m_items) binary allocations (EF1 guaranteed)
+    """
+    N, n_agents, m_items = valuation_matrices.shape
+    allocation_matrices = np.zeros((N, n_agents, m_items), dtype=int)
+
+    # Loop over batch (ECE is sequential, hard to vectorize)
+    for i in range(N):
+        allocation_matrices[i] = get_ece_allocation(valuation_matrices[i])
+
+    return allocation_matrices
