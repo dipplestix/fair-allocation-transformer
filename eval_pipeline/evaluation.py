@@ -60,7 +60,8 @@ def evaluate_batch_allocations(valuation_matrices, allocation_matrices, max_nash
     return results_tensors
 
 
-def run_evaluation(data_file, output_csv, output_npz, batch_size=100, eval_type='random', model_config=None):
+def run_evaluation(data_file, output_csv, output_npz, batch_size=100, eval_type='random', model_config=None,
+                  swap_iterations=100, swap_welfare_weight=0.5, swap_min_improvement=0.001):
     """Run evaluation on all matrices in the dataset"""
     print(f"Loading dataset from {data_file}...")
     data = np.load(data_file)
@@ -116,9 +117,9 @@ def run_evaluation(data_file, output_csv, output_npz, batch_size=100, eval_type=
                     model, batch_matrices,
                     apply_swap_refinement=True,
                     swap_params={
-                        'max_iterations': args.swap_iterations,
-                        'welfare_weight': args.swap_welfare_weight,
-                        'min_improvement': args.swap_min_improvement
+                        'max_iterations': swap_iterations,
+                        'welfare_weight': swap_welfare_weight,
+                        'min_improvement': swap_min_improvement
                     }
                 )
             else:
@@ -248,7 +249,8 @@ def main():
         print(f"Error: --model_config must be provided when --eval_type is '{args.eval_type}'")
         return
 
-    run_evaluation(args.data_file, args.output_csv, args.output_npz, args.batch_size, args.eval_type, args.model_config)
+    run_evaluation(args.data_file, args.output_csv, args.output_npz, args.batch_size, args.eval_type, args.model_config,
+                  args.swap_iterations, args.swap_welfare_weight, args.swap_min_improvement)
 
 if __name__ == "__main__":
     main()
