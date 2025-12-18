@@ -118,6 +118,7 @@ def main():
     parser.add_argument('--agents', type=int, default=10, help='Number of agents (default: 10)')
     parser.add_argument('--items', type=int, default=14, help='Number of items (default: 14)')
     parser.add_argument('--num_matrices', type=int, required=True, help='Number of valuation matrices to generate')
+    parser.add_argument('--dir', type=str, required=False, help='Output directory to save the dataset, default: datasets/')
     parser.add_argument('--output', type=str, required=False, help='Output .npz file to save the dataset, default: dataset_<agents>_<items>_<num_matrices>_dataset.npz')
 
     args = parser.parse_args()
