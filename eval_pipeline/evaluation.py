@@ -60,7 +60,8 @@ def evaluate_batch_allocations(valuation_matrices, allocation_matrices, max_nash
     return results_tensors
 
 
-def run_evaluation(data_file, output_csv, output_npz, batch_size=100, eval_type='random', model_config=None):
+def run_evaluation(data_file, output_csv, output_npz, batch_size=100, eval_type='random', model_config=None,
+                  ef1_repair_max_passes=10):
     """Run evaluation on all matrices in the dataset"""
     print(f"Loading dataset from {data_file}...")
     data = np.load(data_file)
@@ -75,13 +76,18 @@ def run_evaluation(data_file, output_csv, output_npz, batch_size=100, eval_type=
     print(f"Dataset loaded: {len(matrices)} matrices")
     print(f"Matrix shape: {matrices[0].shape}")
 
-    if eval_type == 'model':
+    if eval_type.startswith('model'):
         print(f"Loading model for config file: {model_config}...")
         model, model_name = load_model(model_config)
         print(f"Model {model_config} loaded.")
 
-        output_csv = "results/" + output_csv + "_" + data_file[0] + "_" + data_file[1] + "_" + data_file[2] + "_" + model_name + ".csv"
-        output_npz = "results/" + output_npz + "_" + data_file[0] + "_" + data_file[1] + "_" + data_file[2] + "_" + model_name + ".npz"
+        if eval_type == 'model_with_ef1_repair':
+            suffix = model_name + "_with_ef1_repair"
+        else:
+            suffix = model_name
+
+        output_csv = "results/" + output_csv + "_" + data_file[0] + "_" + data_file[1] + "_" + data_file[2] + "_" + suffix + ".csv"
+        output_npz = "results/" + output_npz + "_" + data_file[0] + "_" + data_file[1] + "_" + data_file[2] + "_" + suffix + ".npz"
     else:
         output_csv = "results/" + output_csv + "_" + data_file[0] + "_" + data_file[1] + "_" + data_file[2] + "_" + eval_type + ".csv"
         output_npz = "results/" + output_npz + "_" + data_file[0] + "_" + data_file[1] + "_" + data_file[2] + "_" + eval_type + ".npz"
@@ -105,8 +111,17 @@ def run_evaluation(data_file, output_csv, output_npz, batch_size=100, eval_type=
         start_time = time.perf_counter()
         if eval_type.startswith('model'):
             # Get model allocations for the batch
-            batch_allocations = get_model_allocations_batch(model, batch_matrices)
-            
+            if eval_type == 'model_with_ef1_repair':
+                # Apply EF1 quick repair post-processing
+                batch_allocations = get_model_allocations_batch(
+                    model, batch_matrices,
+                    apply_ef1_repair=True,
+                    ef1_repair_params={'max_passes': ef1_repair_max_passes}
+                )
+            else:
+                # Standard model without post-processing
+                batch_allocations = get_model_allocations_batch(model, batch_matrices)
+
         elif eval_type == 'rr':
             batch_allocations = get_rr_allocations_batch_old(batch_matrices)
             # since we are generating 5 allocations per matrix for random and rr, we need to repeat the max values and valuation matrices
@@ -215,19 +230,21 @@ def main():
     parser.add_argument('--output_csv', default='evaluation_results', help='Output CSV filename')
     parser.add_argument('--output_npz', default='evaluation_results', help='Output NPZ filename')
     parser.add_argument('--batch_size', type=int, default=100, help='Batch size for processing (default: 100)')
-    parser.add_argument('--eval_type', default='random', help='Type of evaluation: model, random, round robin (rr), or envy cycle elimination (ece) (default: random)')
-    parser.add_argument('--model_config', type=str, default=None, help='Path to model config file (required if eval_type is model)')
+    parser.add_argument('--eval_type', default='random', help='Type of evaluation: model, model_with_ef1_repair, random, rr, or ece (default: random)')
+    parser.add_argument('--model_config', type=str, default=None, help='Path to model config file (required if eval_type is model or model_with_ef1_repair)')
+    parser.add_argument('--ef1_repair_max_passes', type=int, default=10, help='Max passes for EF1 quick repair (default: 10)')
     args = parser.parse_args()
 
     if not args.data_file.endswith('.npz'):
         print("Error: Input file must be a .npz file")
         return
-    
-    if args.eval_type == 'model' and args.model_config is None:
-        print("Error: --model_config must be provided when --eval_type is 'model'")
+
+    if args.eval_type in ['model', 'model_with_ef1_repair'] and args.model_config is None:
+        print(f"Error: --model_config must be provided when --eval_type is '{args.eval_type}'")
         return
 
-    run_evaluation(args.data_file, args.output_csv, args.output_npz, args.batch_size, args.eval_type, args.model_config)
+    run_evaluation(args.data_file, args.output_csv, args.output_npz, args.batch_size, args.eval_type, args.model_config,
+                  args.ef1_repair_max_passes)
 
 if __name__ == "__main__":
     main()

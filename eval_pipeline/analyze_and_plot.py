@@ -14,8 +14,9 @@ def load_results():
     for m in range(10, 21):
         dataset_pattern = f'10_{m}_100000'
 
-        # Model results
-        model_files = list(results_dir.glob(f'evaluation_results_{dataset_pattern}_best_from_sweep_*.csv'))
+        # Model results (without EF1 repair) - exclude files ending with _repair or _swaps
+        model_files = [f for f in results_dir.glob(f'evaluation_results_{dataset_pattern}_best_from_sweep_*.csv')
+                       if not f.name.endswith('_repair.csv') and not f.name.endswith('_swaps.csv')]
         if model_files:
             df = pd.read_csv(model_files[0])
             summary = {
@@ -28,6 +29,24 @@ def load_results():
                 'utility_pct': df['fraction_util_welfare'].mean() * 100,
                 'nash_welfare_pct': df['fraction_nash_welfare'].mean() * 100,
                 'avg_time_ms': df['inference_time'].mean() * 1000,  # Convert to ms
+                'batch_size': df['batch_size'].iloc[0]
+            }
+            data.append(summary)
+
+        # Model + EF1 Repair results
+        ef1_files = list(results_dir.glob(f'evaluation_results_{dataset_pattern}_best_from_sweep_*_with_ef1_repair.csv'))
+        if ef1_files:
+            df = pd.read_csv(ef1_files[0])
+            summary = {
+                'dataset': f'10_{m}',
+                'm': m,
+                'type': 'Model+EF1',
+                'ef_pct': (df['envy_free'] == True).mean() * 100,
+                'ef1_pct': (df['ef1'] == True).mean() * 100,
+                'efx_pct': (df['efx'] == True).mean() * 100,
+                'utility_pct': df['fraction_util_welfare'].mean() * 100,
+                'nash_welfare_pct': df['fraction_nash_welfare'].mean() * 100,
+                'avg_time_ms': df['inference_time'].mean() * 1000,
                 'batch_size': df['batch_size'].iloc[0]
             }
             data.append(summary)
@@ -68,7 +87,7 @@ def load_results():
             }
             data.append(summary)
 
-        # ECE baseline
+        # ECE baseline (Envy Cycle Elimination)
         ece_files = list(results_dir.glob(f'evaluation_results_{dataset_pattern}_ece.csv'))
         if ece_files:
             df = pd.read_csv(ece_files[0])
@@ -76,6 +95,24 @@ def load_results():
                 'dataset': f'10_{m}',
                 'm': m,
                 'type': 'ECE',
+                'ef_pct': (df['envy_free'] == True).mean() * 100,
+                'ef1_pct': (df['ef1'] == True).mean() * 100,
+                'efx_pct': (df['efx'] == True).mean() * 100,
+                'utility_pct': df['fraction_util_welfare'].mean() * 100,
+                'nash_welfare_pct': df['fraction_nash_welfare'].mean() * 100,
+                'avg_time_ms': df['inference_time'].mean() * 1000,
+                'batch_size': df['batch_size'].iloc[0]
+            }
+            data.append(summary)
+
+        # Random + EF1 Repair results
+        random_ef1_files = list(results_dir.glob(f'evaluation_results_{dataset_pattern}_random_with_ef1_repair.csv'))
+        if random_ef1_files:
+            df = pd.read_csv(random_ef1_files[0])
+            summary = {
+                'dataset': f'10_{m}',
+                'm': m,
+                'type': 'Random+EF1',
                 'ef_pct': (df['envy_free'] == True).mean() * 100,
                 'ef1_pct': (df['ef1'] == True).mean() * 100,
                 'efx_pct': (df['efx'] == True).mean() * 100,
@@ -120,7 +157,7 @@ def print_runtime_comparison(df):
 
     print(f"{'Method':<12} {'Avg Time (ms)':<18} {'Avg Batch Size':<16} {'Time per item (ms)':<20}")
     print("-" * 80)
-    for method in ['Model', 'RR', 'ECE', 'Random']:
+    for method in ['Model', 'Model+EF1', 'RR', 'ECE', 'Random', 'Random+EF1']:
         if method in avg_by_type.index:
             row = avg_by_type.loc[method]
             time_per_item = row['avg_time_ms'] / row['batch_size']
@@ -132,8 +169,8 @@ def create_plots(df):
     """Create comparison plots"""
     # Set up the plot style
     plt.style.use('seaborn-v0_8-darkgrid')
-    colors = {'Model': '#2E86AB', 'RR': '#A23B72', 'ECE': '#06A77D', 'Random': '#F18F01'}
-    markers = {'Model': 'o', 'RR': 's', 'ECE': 'D', 'Random': '^'}
+    colors = {'Model': '#2E86AB', 'Model+EF1': '#28A745', 'RR': '#A23B72', 'ECE': '#6F42C1', 'Random': '#F18F01', 'Random+EF1': '#DC3545'}
+    markers = {'Model': 'o', 'Model+EF1': 'D', 'RR': 's', 'ECE': 'p', 'Random': '^', 'Random+EF1': 'v'}
 
     # Create figure with subplots
     fig, axes = plt.subplots(2, 3, figsize=(18, 12))
@@ -149,11 +186,12 @@ def create_plots(df):
     ]
 
     for metric, title, ax in metrics:
-        for method in ['Model', 'RR', 'ECE', 'Random']:
+        for method in ['Model', 'Model+EF1', 'RR', 'ECE', 'Random', 'Random+EF1']:
             method_data = df[df['type'] == method].sort_values('m')
-            ax.plot(method_data['m'], method_data[metric],
-                   label=method, color=colors[method], marker=markers[method],
-                   linewidth=2, markersize=8)
+            if len(method_data) > 0:
+                ax.plot(method_data['m'], method_data[metric],
+                       label=method, color=colors[method], marker=markers[method],
+                       linewidth=2, markersize=8)
 
         ax.set_xlabel('Number of Items (m)', fontsize=11, fontweight='bold')
         ax.set_ylabel(title, fontsize=11, fontweight='bold')
@@ -179,11 +217,12 @@ def create_plots(df):
     fig2, ax2 = plt.subplots(figsize=(10, 6))
     fig2.suptitle('Runtime Comparison vs. Number of Items', fontsize=14, fontweight='bold')
 
-    for method in ['Model', 'RR', 'ECE', 'Random']:
+    for method in ['Model', 'Model+EF1', 'RR', 'ECE', 'Random', 'Random+EF1']:
         method_data = df[df['type'] == method].sort_values('m')
-        ax2.plot(method_data['m'], method_data['avg_time_ms'],
-               label=method, color=colors[method], marker=markers[method],
-               linewidth=2, markersize=8)
+        if len(method_data) > 0:
+            ax2.plot(method_data['m'], method_data['avg_time_ms'],
+                   label=method, color=colors[method], marker=markers[method],
+                   linewidth=2, markersize=8)
 
     ax2.set_xlabel('Number of Items (m)', fontsize=12, fontweight='bold')
     ax2.set_ylabel('Average Runtime (ms per batch)', fontsize=12, fontweight='bold')
