@@ -11,8 +11,19 @@ def get_model_allocations(model, valuation_matrix):
     allocation_matrix = np.zeros_like(valuation_matrix)
     return allocation_matrix
 
-def get_model_allocations_batch(model, valuation_matrices):
-    """Get model allocations for a batch of valuation matrices"""
+def get_model_allocations_batch(model, valuation_matrices, apply_ef1_repair=False,
+                                ef1_repair_params=None):
+    """Get model allocations for a batch of valuation matrices with optional EF1 repair.
+
+    Args:
+        model: Trained FATransformer model
+        valuation_matrices: (N, n_agents, m_items) valuation matrices
+        apply_ef1_repair: Whether to apply EF1 quick repair post-processing
+        ef1_repair_params: Dict of parameters for EF1 repair (e.g., {'max_passes': 10})
+
+    Returns:
+        Allocation matrices of shape (N, n_agents, m_items)
+    """
     N, n_agents, m_items = valuation_matrices.shape
     allocation_matrices = np.zeros((N, n_agents, m_items), dtype=int)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -32,7 +43,14 @@ def get_model_allocations_batch(model, valuation_matrices):
     # transpose to (N, n_agents, m_items)
     allocation_matrices = allocation_matrices.transpose(1, 2).cpu().numpy()
 
-    # Placeholder for batch model allocations
+    # Apply EF1 quick repair if requested
+    if apply_ef1_repair:
+        from utils.ef1_repair import ef1_quick_repair_batch
+        ef1_repair_params = ef1_repair_params or {}
+        allocation_matrices = ef1_quick_repair_batch(
+            allocation_matrices, valuation_matrices, **ef1_repair_params
+        )
+
     return allocation_matrices
 
 def get_random_allocations(valuation_matrix):
