@@ -32,24 +32,6 @@ def load_results():
             }
             data.append(summary)
 
-        # Model with swaps results
-        model_swap_files = list(results_dir.glob(f'evaluation_results_{dataset_pattern}_best_from_sweep_*_with_swaps.csv'))
-        if model_swap_files:
-            df = pd.read_csv(model_swap_files[0])
-            summary = {
-                'dataset': f'10_{m}',
-                'm': m,
-                'type': 'Model+Swaps',
-                'ef_pct': (df['envy_free'] == True).mean() * 100,
-                'ef1_pct': (df['ef1'] == True).mean() * 100,
-                'efx_pct': (df['efx'] == True).mean() * 100,
-                'utility_pct': df['fraction_util_welfare'].mean() * 100,
-                'nash_welfare_pct': df['fraction_nash_welfare'].mean() * 100,
-                'avg_time_ms': df['inference_time'].mean() * 1000,  # Convert to ms
-                'batch_size': df['batch_size'].iloc[0]
-            }
-            data.append(summary)
-
         # Random baseline
         random_files = list(results_dir.glob(f'evaluation_results_{dataset_pattern}_random.csv'))
         if random_files:
@@ -138,7 +120,7 @@ def print_runtime_comparison(df):
 
     print(f"{'Method':<12} {'Avg Time (ms)':<18} {'Avg Batch Size':<16} {'Time per item (ms)':<20}")
     print("-" * 80)
-    for method in ['Model', 'Model+Swaps', 'RR', 'ECE', 'Random']:
+    for method in ['Model', 'RR', 'ECE', 'Random']:
         if method in avg_by_type.index:
             row = avg_by_type.loc[method]
             time_per_item = row['avg_time_ms'] / row['batch_size']
@@ -150,8 +132,8 @@ def create_plots(df):
     """Create comparison plots"""
     # Set up the plot style
     plt.style.use('seaborn-v0_8-darkgrid')
-    colors = {'Model': '#2E86AB', 'Model+Swaps': '#1A5F7A', 'RR': '#A23B72', 'ECE': '#06A77D', 'Random': '#F18F01'}
-    markers = {'Model': 'o', 'Model+Swaps': '*', 'RR': 's', 'ECE': 'D', 'Random': '^'}
+    colors = {'Model': '#2E86AB', 'RR': '#A23B72', 'ECE': '#06A77D', 'Random': '#F18F01'}
+    markers = {'Model': 'o', 'RR': 's', 'ECE': 'D', 'Random': '^'}
 
     # Create figure with subplots
     fig, axes = plt.subplots(2, 3, figsize=(18, 12))
@@ -167,12 +149,11 @@ def create_plots(df):
     ]
 
     for metric, title, ax in metrics:
-        for method in ['Model', 'Model+Swaps', 'RR', 'ECE', 'Random']:
+        for method in ['Model', 'RR', 'ECE', 'Random']:
             method_data = df[df['type'] == method].sort_values('m')
-            if len(method_data) > 0:  # Only plot if data exists
-                ax.plot(method_data['m'], method_data[metric],
-                       label=method, color=colors[method], marker=markers[method],
-                       linewidth=2, markersize=8 if method != 'Model+Swaps' else 12)
+            ax.plot(method_data['m'], method_data[metric],
+                   label=method, color=colors[method], marker=markers[method],
+                   linewidth=2, markersize=8)
 
         ax.set_xlabel('Number of Items (m)', fontsize=11, fontweight='bold')
         ax.set_ylabel(title, fontsize=11, fontweight='bold')
@@ -198,12 +179,11 @@ def create_plots(df):
     fig2, ax2 = plt.subplots(figsize=(10, 6))
     fig2.suptitle('Runtime Comparison vs. Number of Items', fontsize=14, fontweight='bold')
 
-    for method in ['Model', 'Model+Swaps', 'RR', 'ECE', 'Random']:
+    for method in ['Model', 'RR', 'ECE', 'Random']:
         method_data = df[df['type'] == method].sort_values('m')
-        if len(method_data) > 0:  # Only plot if data exists
-            ax2.plot(method_data['m'], method_data['avg_time_ms'],
-                   label=method, color=colors[method], marker=markers[method],
-                   linewidth=2, markersize=8 if method != 'Model+Swaps' else 12)
+        ax2.plot(method_data['m'], method_data['avg_time_ms'],
+               label=method, color=colors[method], marker=markers[method],
+               linewidth=2, markersize=8)
 
     ax2.set_xlabel('Number of Items (m)', fontsize=12, fontweight='bold')
     ax2.set_ylabel('Average Runtime (ms per batch)', fontsize=12, fontweight='bold')

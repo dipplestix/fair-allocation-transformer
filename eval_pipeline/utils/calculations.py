@@ -172,32 +172,3 @@ def nash_welfare_batch(agent_bundle_values_batch):
     m = agent_bundle_values_batch.shape[1]
     return prod_diagonals ** (1 / m)
 
-def compute_envy_matrix_batch(valuation_matrices, allocation_matrices):
-    """Vectorized envy computation for batch
-
-    Args:
-        valuation_matrices: (N, n_agents, m_items)
-        allocation_matrices: (N, n_agents, m_items)
-
-    Returns:
-        envy_matrices: (N, n_agents, n_agents)
-        where envy[b][i][j] = max(0, value_i(bundle_j) - value_i(bundle_i))
-    """
-    # Compute how much each agent values each other agent's bundle
-    agent_bundle_values = calculate_agent_bundle_values_batch(
-        valuation_matrices, allocation_matrices
-    )  # (N, n_agents, n_agents)
-
-    # Extract diagonal (own values) for each instance
-    N = agent_bundle_values.shape[0]
-    own_values = np.diagonal(agent_bundle_values, axis1=1, axis2=2)  # (N, n_agents)
-
-    # Compute envy: value_i(bundle_j) - value_i(bundle_i)
-    envy_matrices = agent_bundle_values - own_values[:, :, np.newaxis]
-    envy_matrices = np.maximum(0, envy_matrices)
-
-    # Zero out diagonal (no self-envy)
-    for i in range(N):
-        np.fill_diagonal(envy_matrices[i], 0)
-
-    return envy_matrices
