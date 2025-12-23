@@ -340,3 +340,52 @@ def get_ece_allocations_batch(valuation_matrices):
         allocation_matrices[i] = get_ece_allocation(valuation_matrices[i])
 
     return allocation_matrices
+
+
+def get_max_util_allocations(valuation_matrix):
+    """Generate max utilitarian welfare allocation (greedy: each item to highest-valuing agent)"""
+    n_agents, m_items = valuation_matrix.shape
+    allocation_matrix = np.zeros((n_agents, m_items), dtype=int)
+
+    # Assign each item to the agent that values it most
+    best_agents = np.argmax(valuation_matrix, axis=0)  # shape: (m_items,)
+    allocation_matrix[best_agents, np.arange(m_items)] = 1
+
+    return allocation_matrix
+
+
+def get_max_util_allocations_batch(valuation_matrices):
+    """Batch version for max utilitarian welfare allocations"""
+    N, n_agents, m_items = valuation_matrices.shape
+    allocation_matrices = np.zeros((N, n_agents, m_items), dtype=int)
+
+    # Vectorized: for each matrix, find argmax across agents for each item
+    best_agents = np.argmax(valuation_matrices, axis=1)  # shape: (N, m_items)
+
+    # Use advanced indexing to set the allocations
+    batch_indices = np.arange(N)[:, None]
+    item_indices = np.arange(m_items)
+    allocation_matrices[batch_indices, best_agents, item_indices] = 1
+
+    return allocation_matrices
+
+
+def get_max_nash_allocation(valuation_matrix):
+    """Generate max Nash welfare allocation using Gurobi LP with PWL approximation"""
+    from utils.max_utility import best_nash_welfare
+    _, allocation = best_nash_welfare(valuation_matrix, return_allocation=True)
+    return allocation
+
+
+def get_max_nash_allocations_batch(valuation_matrices):
+    """Batch version for max Nash welfare allocations.
+
+    Note: This is slow as it requires solving a MIP for each matrix.
+    """
+    N, n_agents, m_items = valuation_matrices.shape
+    allocation_matrices = np.zeros((N, n_agents, m_items), dtype=int)
+
+    for i in range(N):
+        allocation_matrices[i] = get_max_nash_allocation(valuation_matrices[i])
+
+    return allocation_matrices

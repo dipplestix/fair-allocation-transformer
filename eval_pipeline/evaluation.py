@@ -4,7 +4,7 @@ import pandas as pd
 from tqdm import tqdm
 from utils.calculations import calculate_agent_bundle_values, is_envy_free, is_ef1, is_efx, utility_sum, nash_welfare
 from utils.calculations import calculate_agent_bundle_values_batch, is_envy_free_batch, utility_sum_batch, nash_welfare_batch, is_ef1_batch, is_efx_batch
-from utils.inference import get_model_allocations_batch, get_random_allocations_batch, get_rr_allocations_batch, get_rr_allocations_batch_old, get_ece_allocations_batch
+from utils.inference import get_model_allocations_batch, get_random_allocations_batch, get_rr_allocations_batch, get_rr_allocations_batch_old, get_ece_allocations_batch, get_max_util_allocations_batch, get_max_nash_allocations_batch
 from utils.load_model import load_model
 import time
 
@@ -131,6 +131,26 @@ def run_evaluation(data_file, output_csv, output_npz, batch_size=100, eval_type=
         elif eval_type == 'ece':
             batch_allocations = get_ece_allocations_batch(batch_matrices)
             # ECE generates 1 allocation per matrix (like RR), no averaging needed
+        elif eval_type == 'max_util':
+            batch_allocations = get_max_util_allocations_batch(batch_matrices)
+            # MaxUtil generates 1 allocation per matrix
+        elif eval_type == 'max_util_with_ef1_repair':
+            batch_allocations = get_max_util_allocations_batch(batch_matrices)
+            # Apply EF1 repair
+            from utils.ef1_repair import ef1_quick_repair_batch
+            batch_allocations = ef1_quick_repair_batch(
+                batch_allocations, batch_matrices, max_passes=ef1_repair_max_passes
+            )
+        elif eval_type == 'max_nash':
+            batch_allocations = get_max_nash_allocations_batch(batch_matrices)
+            # MaxNash generates 1 allocation per matrix
+        elif eval_type == 'max_nash_with_ef1_repair':
+            batch_allocations = get_max_nash_allocations_batch(batch_matrices)
+            # Apply EF1 repair
+            from utils.ef1_repair import ef1_quick_repair_batch
+            batch_allocations = ef1_quick_repair_batch(
+                batch_allocations, batch_matrices, max_passes=ef1_repair_max_passes
+            )
         else:  # random
             batch_allocations = get_random_allocations_batch(batch_matrices)
             # since we are generating 5 allocations per matrix for random and rr, we need to repeat the max values and valuation matrices
@@ -230,7 +250,7 @@ def main():
     parser.add_argument('--output_csv', default='evaluation_results', help='Output CSV filename')
     parser.add_argument('--output_npz', default='evaluation_results', help='Output NPZ filename')
     parser.add_argument('--batch_size', type=int, default=100, help='Batch size for processing (default: 100)')
-    parser.add_argument('--eval_type', default='random', help='Type of evaluation: model, model_with_ef1_repair, random, rr, or ece (default: random)')
+    parser.add_argument('--eval_type', default='random', help='Type of evaluation: model, model_with_ef1_repair, random, rr, ece, max_util, max_util_with_ef1_repair, max_nash, or max_nash_with_ef1_repair (default: random)')
     parser.add_argument('--model_config', type=str, default=None, help='Path to model config file (required if eval_type is model or model_with_ef1_repair)')
     parser.add_argument('--ef1_repair_max_passes', type=int, default=10, help='Max passes for EF1 quick repair (default: 10)')
     args = parser.parse_args()
