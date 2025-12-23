@@ -1,5 +1,8 @@
 import numpy as np
 import torch
+from typing import List, Tuple, Optional
+import gurobipy as gp
+from gurobipy import GRB
 
 def get_model_allocations(model, valuation_matrix):
     """Get model allocations for a given valuation matrix"""
