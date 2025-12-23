@@ -96,7 +96,7 @@ def is_ef1_batch(valuation_matrices, allocation_matrices, agent_bundle_values_ba
     own_values = np.diagonal(agent_bundle_values_batch, axis1=1, axis2=2)  # (N,m)
     
     mask = ~np.eye(m, dtype=bool)
-    ef1_conditions = own_values[..., np.newaxis] >= other_value_minus_max
+    ef1_conditions = own_values[..., np.newaxis] >= other_value_minus_max - 1e-9 # small tolerance
     
     return np.all(ef1_conditions[..., mask], axis=1)  # (N,)
 
