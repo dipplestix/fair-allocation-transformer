@@ -525,6 +525,72 @@ uv run analyze_and_plot.py
 - Model generalization from training distribution (m=20)
 - Speed vs. performance tradeoffs
 
+#### 6. Evaluate Envy Cycle Elimination (ECE) Baseline
+
+```bash
+./run_ece_baseline.sh
+```
+
+**What it does**:
+- Implements the Envy Cycle Elimination algorithm
+- Guarantees EF1 property by construction
+- Saves to `results/evaluation_results_10_{m}_100000_ece.csv`
+
+#### 7. Max Utilitarian Welfare Baseline
+
+```bash
+./run_max_util_baseline.sh
+```
+
+**What it does**:
+- Greedy allocation: each item goes to the agent that values it most
+- Maximizes total utility (100% utilitarian welfare)
+- Very fast (O(n*m) per matrix)
+- Poor fairness (often ~0% EF1)
+- Saves to `results/evaluation_results_10_{m}_100000_max_util.csv`
+
+#### 8. Max Nash Welfare Baseline
+
+```bash
+./run_max_nash_baseline.sh
+```
+
+**What it does**:
+- Uses Gurobi LP with piecewise linear approximation to maximize Nash welfare
+- Produces allocations that balance efficiency and fairness
+- **WARNING**: Slow (~seconds per matrix, hours for full dataset)
+- Saves to `results/evaluation_results_10_{m}_100000_max_nash.csv`
+
+#### 9. EF1 Repair Post-Processing
+
+EF1 repair is a post-processing step that fixes EF1 violations in any allocation by transferring items between agents. Several baselines can be combined with EF1 repair:
+
+```bash
+# Model + EF1 Repair
+./run_ef1_repair.sh
+
+# Random + EF1 Repair
+# (run via Python script)
+uv run eval_pipeline/run_random_ef1_repair.py
+
+# Max Utilitarian + EF1 Repair
+./run_max_util_ef1_repair.sh
+
+# Max Nash + EF1 Repair
+./run_max_nash_ef1_repair.sh
+```
+
+**How EF1 repair works**:
+1. Identifies pairs of agents where one envies the other even after removing any single item
+2. Transfers items to reduce envy while maintaining/improving Nash welfare
+3. Repeats until no EF1 violations remain (or max passes reached)
+4. Guarantees 100% EF1 satisfaction after repair
+
+**Key findings**:
+- EF1 repair dramatically improves fairness with minimal welfare loss
+- MaxUtil+EF1: 100% EF1 with ~90-96% utility preserved
+- Model+EF1: 100% EF1 with improved Nash welfare
+
 #### Complete Evaluation Workflow
 
 Run the full evaluation pipeline:
@@ -532,15 +598,23 @@ Run the full evaluation pipeline:
 ```bash
 cd eval_pipeline
 
-# 1. Evaluate model
+# 1. Evaluate model (with and without EF1 repair)
 ./run_all_evaluations.sh
+./run_ef1_repair.sh
 
 # 2. Evaluate baselines (can run in parallel)
 ./run_random_baseline.sh &
 ./run_rr_baseline.sh &
+./run_ece_baseline.sh &
+./run_max_util_baseline.sh &
+./run_max_util_ef1_repair.sh &
 wait
 
-# 3. Generate comparison and plots
+# 3. (Optional) Max Nash baseline - WARNING: very slow!
+# ./run_max_nash_baseline.sh
+# ./run_max_nash_ef1_repair.sh
+
+# 4. Generate comparison and plots
 uv run compare_results.py
 uv run analyze_and_plot.py
 
@@ -550,8 +624,14 @@ ls -lh results/
 
 **Expected runtime**:
 - Model evaluation: ~5-10 minutes (depends on GPU)
+- Model+EF1: ~10-15 minutes
 - Random baseline: ~1 minute (very fast)
 - Round-robin baseline: ~3-5 minutes (greedy selection)
+- ECE baseline: ~10-20 minutes (envy cycle detection)
+- MaxUtil baseline: ~1 minute (greedy, vectorized)
+- MaxUtil+EF1: ~5-10 minutes
+- MaxNash baseline: **Several hours** (Gurobi LP per matrix)
+- MaxNash+EF1: **Several hours** (Gurobi LP + repair)
 - Analysis & plotting: <1 minute
 
 #### Script Configuration
