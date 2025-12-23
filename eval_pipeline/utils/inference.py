@@ -1,5 +1,8 @@
 import numpy as np
 import torch
+from typing import List, Tuple, Optional
+import gurobipy as gp
+from gurobipy import GRB
 
 def get_model_allocations(model, valuation_matrix):
     """Get model allocations for a given valuation matrix"""
@@ -338,5 +341,247 @@ def get_ece_allocations_batch(valuation_matrices):
     # Loop over batch (ECE is sequential, hard to vectorize)
     for i in range(N):
         allocation_matrices[i] = get_ece_allocation(valuation_matrices[i])
+
+    return allocation_matrices
+
+
+# -------------------------
+# C-RR (Welfare-Constrained Round Robin) Functions
+# -------------------------
+
+def _um_total_value_with_fixed_gurobi(
+    V: np.ndarray,
+    quotas: List[int],
+    fixed_pairs: List[Tuple[int, int]],
+    time_limit: float = 10.0
+) -> Optional[float]:
+    """
+    Return the maximum total utility value achievable with fixed assignments.
+    Uses Gurobi to solve the assignment problem.
+    """
+    n, m = V.shape
+    quotas_rem = quotas[:]
+    assigned_items = set()
+    sum_fixed = 0.0
+
+    # Apply fixed assignments
+    for i, o in fixed_pairs:
+        if o in assigned_items or quotas_rem[i] <= 0:
+            return None
+        quotas_rem[i] -= 1
+        assigned_items.add(o)
+        sum_fixed += float(V[i, o])
+
+    remaining_items = [o for o in range(m) if o not in assigned_items]
+    F = len(remaining_items)
+
+    if F == 0:
+        return sum_fixed if sum(quotas_rem) == 0 else None
+    if any(q < 0 for q in quotas_rem) or sum(quotas_rem) != F:
+        return None
+
+    # Build Gurobi model
+    try:
+        model = gp.Model("um_completion")
+        model.setParam('OutputFlag', 0)
+        model.setParam('TimeLimit', time_limit)
+
+        # Binary allocation variables
+        x = model.addVars(n, F, vtype=GRB.BINARY, name="x")
+
+        # Each remaining item assigned to exactly one agent
+        for j_idx in range(F):
+            model.addConstr(gp.quicksum(x[i, j_idx] for i in range(n)) == 1)
+
+        # Each agent gets exactly their remaining quota
+        for i in range(n):
+            model.addConstr(
+                gp.quicksum(x[i, j_idx] for j_idx in range(F)) == quotas_rem[i]
+            )
+
+        # Objective: Maximize total utility
+        obj = gp.quicksum(
+            V[i, remaining_items[j_idx]] * x[i, j_idx]
+            for i in range(n)
+            for j_idx in range(F)
+        )
+        model.setObjective(obj, GRB.MAXIMIZE)
+
+        model.optimize()
+
+        if model.status == GRB.OPTIMAL:
+            return sum_fixed + model.objVal
+        else:
+            return None
+
+    except Exception as e:
+        print(f"Gurobi error: {e}")
+        return None
+
+
+def _equivalence_classes_for_agent(V_row: np.ndarray, tol: float = 1e-12) -> List[List[int]]:
+    """Turn a valuation row into equivalence classes in descending order."""
+    m = V_row.shape[0]
+    order = sorted(range(m), key=lambda o: (-float(V_row[o]), o))
+    classes: List[List[int]] = []
+    if m == 0:
+        return classes
+    current = [order[0]]
+    for prev, cur in zip(order, order[1:]):
+        if abs(float(V_row[prev]) - float(V_row[cur])) <= tol:
+            current.append(cur)
+        else:
+            classes.append(current)
+            current = [cur]
+    classes.append(current)
+    return classes
+
+
+def _constrained_round_robin_single(
+    V: np.ndarray,
+    welfare: str = "um",
+    tol: float = 1e-8,
+    gurobi_time_limit: float = 10.0
+) -> Tuple[List[Tuple[int, int]], np.ndarray]:
+    """Single instance of W-CRR (Welfare-Constrained Round Robin) algorithm."""
+    assert V.ndim == 2
+    n, m = V.shape
+    assert n >= 1 and m >= 1
+
+    # Balanced quotas
+    base = m // n
+    r = m % n
+    quotas = [base + (1 if i < r else 0) for i in range(n)]
+
+    # Precompute UM* value (w*) if needed
+    if welfare == "um":
+        w_star = _um_total_value_with_fixed_gurobi(V, quotas, [], gurobi_time_limit)
+        if w_star is None:
+            raise RuntimeError("UM oracle: baseline allocation infeasible with balanced quotas.")
+    elif welfare == "none":
+        w_star = None
+    else:
+        raise ValueError("welfare must be 'um' or 'none'.")
+
+    # Build equivalence class lists (descending)
+    pref_classes: List[List[List[int]]] = [
+        _equivalence_classes_for_agent(V[i, :]) for i in range(n)
+    ]
+    top_idx = [0 for _ in range(n)]
+
+    # State
+    assigned_count = [0] * n
+    assigned_items = set()
+    picks: List[Tuple[int, int]] = []
+
+    def active_agents() -> List[int]:
+        out = []
+        for i in range(n):
+            if assigned_count[i] >= quotas[i]:
+                continue
+            k = top_idx[i]
+            while k < len(pref_classes[i]) and all(o in assigned_items for o in pref_classes[i][k]):
+                k += 1
+            if k < len(pref_classes[i]):
+                out.append(i)
+        return out
+
+    def current_top_available(i: int) -> List[int]:
+        k = top_idx[i]
+        while k < len(pref_classes[i]) and all(o in assigned_items for o in pref_classes[i][k]):
+            k += 1
+        if k >= len(pref_classes[i]):
+            return []
+        return [o for o in pref_classes[i][k] if o not in assigned_items]
+
+    # Main loop
+    while len(assigned_items) < m:
+        N_active = active_agents()
+        if not N_active:
+            raise RuntimeError("CRR got stuck: no active agents although items remain.")
+
+        min_count = min(assigned_count[i] for i in N_active)
+        N_min = sorted([i for i in N_active if assigned_count[i] == min_count])
+
+        chosen: Optional[Tuple[int, int]] = None
+
+        for i in N_min:
+            top_items = current_top_available(i)
+            if not top_items:
+                continue
+            for o in top_items:
+                if welfare == "none":
+                    chosen = (i, o)
+                    break
+                else:
+                    val = _um_total_value_with_fixed_gurobi(
+                        V, quotas, picks + [(i, o)], gurobi_time_limit
+                    )
+                    if val is not None and val >= (w_star - tol * max(1.0, abs(w_star))):
+                        chosen = (i, o)
+                        break
+            if chosen is not None:
+                break
+
+        if chosen is not None:
+            i, o = chosen
+            picks.append((i, o))
+            assigned_items.add(o)
+            assigned_count[i] += 1
+            continue
+
+        for i in N_min:
+            if top_idx[i] < len(pref_classes[i]):
+                top_idx[i] += 1
+
+    # Build assignment matrix
+    X = np.zeros_like(V, dtype=np.int64)
+    for i, o in picks:
+        X[i, o] = 1
+
+    return picks, X
+
+
+def get_crr_allocations_batch(
+    valuation_matrices: np.ndarray,
+    welfare: str = "um",
+    tol: float = 1e-8,
+    gurobi_time_limit: float = 10.0,
+    verbose: bool = False
+) -> np.ndarray:
+    """
+    Generate W-CRR allocations for a batch of valuation matrices.
+
+    Args:
+        valuation_matrices: (N, n_agents, m_items) - batch of valuation matrices
+        welfare: 'um' (utilitarian-maximal) or 'none' (no welfare constraint)
+        tol: numerical tolerance for equality checks
+        gurobi_time_limit: time limit for each Gurobi solve (seconds)
+        verbose: print progress
+
+    Returns:
+        allocation_matrices: (N, n_agents, m_items) - batch of allocation matrices
+    """
+    assert valuation_matrices.ndim == 3, "Expected (N, n_agents, m_items) shape"
+    N, n_agents, m_items = valuation_matrices.shape
+
+    allocation_matrices = np.zeros((N, n_agents, m_items), dtype=np.int64)
+
+    for batch_idx in range(N):
+        if verbose and (batch_idx + 1) % 10 == 0:
+            print(f"Processing {batch_idx + 1}/{N}...")
+
+        V = valuation_matrices[batch_idx]
+        try:
+            _, X = _constrained_round_robin_single(
+                V, welfare=welfare, tol=tol,
+                gurobi_time_limit=gurobi_time_limit
+            )
+            allocation_matrices[batch_idx] = X
+        except Exception as e:
+            if verbose:
+                print(f"Error processing batch {batch_idx}: {e}")
+            # Return zero allocation for failed instances
+            allocation_matrices[batch_idx] = np.zeros((n_agents, m_items), dtype=np.int64)
 
     return allocation_matrices

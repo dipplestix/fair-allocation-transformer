@@ -4,7 +4,7 @@ import pandas as pd
 from tqdm import tqdm
 from utils.calculations import calculate_agent_bundle_values, is_envy_free, is_ef1, is_efx, utility_sum, nash_welfare
 from utils.calculations import calculate_agent_bundle_values_batch, is_envy_free_batch, utility_sum_batch, nash_welfare_batch, is_ef1_batch, is_efx_batch
-from utils.inference import get_model_allocations_batch, get_random_allocations_batch, get_rr_allocations_batch, get_rr_allocations_batch_old, get_ece_allocations_batch
+from utils.inference import get_model_allocations_batch, get_random_allocations_batch, get_rr_allocations_batch, get_rr_allocations_batch_old, get_ece_allocations_batch, get_crr_allocations_batch
 from utils.load_model import load_model
 import time
 
@@ -61,7 +61,7 @@ def evaluate_batch_allocations(valuation_matrices, allocation_matrices, max_nash
 
 
 def run_evaluation(data_file, output_csv, output_npz, batch_size=100, eval_type='random', model_config=None,
-                  ef1_repair_max_passes=10):
+                  ef1_repair_max_passes=10, max_samples=None):
     """Run evaluation on all matrices in the dataset"""
     print(f"Loading dataset from {data_file}...")
     data = np.load(data_file)
@@ -72,6 +72,13 @@ def run_evaluation(data_file, output_csv, output_npz, batch_size=100, eval_type=
     matrices = data['matrices']
     nash_welfare_max = data['nash_welfare']
     util_welfare_max = data['util_welfare']
+
+    # Limit to max_samples if specified
+    if max_samples is not None and max_samples < len(matrices):
+        matrices = matrices[:max_samples]
+        nash_welfare_max = nash_welfare_max[:max_samples]
+        util_welfare_max = util_welfare_max[:max_samples]
+        print(f"Limited to first {max_samples} matrices")
 
     print(f"Dataset loaded: {len(matrices)} matrices")
     print(f"Matrix shape: {matrices[0].shape}")
@@ -131,6 +138,9 @@ def run_evaluation(data_file, output_csv, output_npz, batch_size=100, eval_type=
         elif eval_type == 'ece':
             batch_allocations = get_ece_allocations_batch(batch_matrices)
             # ECE generates 1 allocation per matrix (like RR), no averaging needed
+        elif eval_type == 'crr':
+            batch_allocations = get_crr_allocations_batch(batch_matrices)
+            # C-RR generates 1 allocation per matrix
         else:  # random
             batch_allocations = get_random_allocations_batch(batch_matrices)
             # since we are generating 5 allocations per matrix for random and rr, we need to repeat the max values and valuation matrices
@@ -230,9 +240,10 @@ def main():
     parser.add_argument('--output_csv', default='evaluation_results', help='Output CSV filename')
     parser.add_argument('--output_npz', default='evaluation_results', help='Output NPZ filename')
     parser.add_argument('--batch_size', type=int, default=100, help='Batch size for processing (default: 100)')
-    parser.add_argument('--eval_type', default='random', help='Type of evaluation: model, model_with_ef1_repair, random, rr, or ece (default: random)')
+    parser.add_argument('--eval_type', default='random', help='Type of evaluation: model, model_with_ef1_repair, random, rr, ece, or crr (default: random)')
     parser.add_argument('--model_config', type=str, default=None, help='Path to model config file (required if eval_type is model or model_with_ef1_repair)')
     parser.add_argument('--ef1_repair_max_passes', type=int, default=10, help='Max passes for EF1 quick repair (default: 10)')
+    parser.add_argument('--max_samples', type=int, default=None, help='Maximum number of samples to evaluate (default: all)')
     args = parser.parse_args()
 
     if not args.data_file.endswith('.npz'):
@@ -244,7 +255,7 @@ def main():
         return
 
     run_evaluation(args.data_file, args.output_csv, args.output_npz, args.batch_size, args.eval_type, args.model_config,
-                  args.ef1_repair_max_passes)
+                  args.ef1_repair_max_passes, args.max_samples)
 
 if __name__ == "__main__":
     main()
