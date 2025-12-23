@@ -148,23 +148,14 @@ def get_rr_allocations_batch_old(valuation_matrices, n_permutations=5):
                             break
 
     return allocation_matrices
+
 import numpy as np
 import gurobipy as gp
 from gurobipy import GRB
 from typing import List, Tuple, Dict, Optional
 
-# Import your existing functions
-from utils.calculations import (
-    calculate_agent_bundle_values_batch,
-    is_ef1_batch,
-    is_envy_free_batch,
-    utility_sum_batch,
-    best_utilitarian_welfare
-)
-
-
 # -------------------------
-# UM oracle using Gurobi (adapted from your code pattern)
+# UM oracle using Gurobi 
 # -------------------------
 def _um_total_value_with_fixed_gurobi(
     V: np.ndarray,
@@ -366,7 +357,7 @@ def _constrained_round_robin_single(
 
 
 # -------------------------
-# Batched W-CRR (following your RR pattern)
+# Batched W-CRR (following RR pattern)
 # -------------------------
 def get_crr_allocations_batch(
     valuation_matrices: np.ndarray,
@@ -413,52 +404,3 @@ def get_crr_allocations_batch(
     
     return allocation_matrices
 
-
-# -------------------------
-# Convenience function with your metrics
-# -------------------------
-def get_crr_allocations_batch_with_stats(
-    valuation_matrices: np.ndarray,
-    welfare: str = "um",
-    tol: float = 1e-8,
-    gurobi_time_limit: float = 10.0
-) -> Tuple[np.ndarray, Dict]:
-    """Generate W-CRR allocations with statistics using your metrics."""
-    
-    allocations = get_crr_allocations_batch(
-        valuation_matrices, welfare, tol, gurobi_time_limit
-    )
-    
-    # Use your existing functions
-    agent_values = calculate_agent_bundle_values_batch(valuation_matrices, allocations)
-    
-    stats = {
-        'ef1_rate': float(np.mean(is_ef1_batch(valuation_matrices, allocations, agent_values))),
-        'ef_rate': float(np.mean(is_envy_free_batch(agent_values))),
-        'mean_utility': float(np.mean(utility_sum_batch(agent_values))),
-        'std_utility': float(np.std(utility_sum_batch(agent_values))),
-    }
-    
-    return allocations, stats
-
-
-# -------------------------
-# Example usage
-# -------------------------
-if __name__ == "__main__":
-    np.random.seed(42)
-    N, n_agents, m_items = 5, 3, 6
-    
-    valuation_matrices = np.random.rand(N, n_agents, m_items)
-    
-    print(f"Running W-CRR on {N} instances with {n_agents} agents and {m_items} items")
-    
-    # Test with UM welfare
-    allocations_um = get_crr_allocations_batch(valuation_matrices, welfare='um', verbose=True)
-    print(f"\nUM-CRR allocations shape: {allocations_um.shape}")
-    
-    # Get statistics using your functions
-    allocations, stats = get_crr_allocations_batch_with_stats(valuation_matrices, welfare='um')
-    print(f"\nStatistics for UM-CRR:")
-    for key, value in stats.items():
-        print(f"  {key}: {value:.4f}")

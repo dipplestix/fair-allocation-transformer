@@ -4,7 +4,7 @@ import pandas as pd
 from tqdm import tqdm
 from utils.calculations import calculate_agent_bundle_values, is_envy_free, is_ef1, is_efx, utility_sum, nash_welfare
 from utils.calculations import calculate_agent_bundle_values_batch, is_envy_free_batch, utility_sum_batch, nash_welfare_batch, is_ef1_batch, is_efx_batch
-from utils.inference import get_model_allocations_batch, get_random_allocations_batch, get_rr_allocations_batch, get_rr_allocations_batch_old
+from utils.inference import get_model_allocations_batch, get_random_allocations_batch, get_rr_allocations_batch_old, get_crr_allocations_batch
 from utils.load_model import load_model
 import time
 
@@ -113,12 +113,19 @@ def run_evaluation(data_file, output_csv, output_npz, batch_size=100, eval_type=
             # batch_nash_max = np.repeat(batch_nash_max, 5)
             # batch_util_max = np.repeat(batch_util_max, 5)
             # batch_matrices = np.repeat(batch_matrices, 5, axis=0)
-        else:  # random
+        elif eval_type == 'rrc':
+            batch_allocations = get_crr_allocations_batch(batch_matrices)
+
+        elif eval_type == 'random':
+            
             batch_allocations = get_random_allocations_batch(batch_matrices)
             # since we are generating 5 allocations per matrix for random and rr, we need to repeat the max values and valuation matrices
             batch_nash_max = np.repeat(batch_nash_max, 5)
             batch_util_max = np.repeat(batch_util_max, 5)
             batch_matrices = np.repeat(batch_matrices, 5, axis=0)
+        
+        else:
+            raise ValueError(f"Unknown eval_type: {eval_type}")
         end_time = time.perf_counter()
         # Evaluate the allocation
         results_tensors = evaluate_batch_allocations(batch_matrices, batch_allocations, batch_nash_max, batch_util_max)
