@@ -1,6 +1,7 @@
 # Wandb artifacts and logs
 wandb/
 .wandb/
+*.txt
 
 # Python
 __pycache__/
@@ -118,6 +119,7 @@ cython_debug/
 .vscode/
 
 # Model checkpoints and weights
+checkpoints/
 *.pt
 *.pth
 *.ckpt

@@ -1,40 +1,8 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from model_components import GLU, MHA
-
-
-class FASelfAttentionBlock(nn.Module):
-    def __init__(self, d_model: int, num_heads: int, dropout: float = 0.0):
-        super().__init__()
-
-        self.attn = MHA(d_model, num_heads, dropout)
-        self.glu = GLU(d_model, int(8/3*d_model), d_model)
-        
-        self.attn_norm = nn.RMSNorm(d_model)
-        self.glu_norm = nn.RMSNorm(d_model)
-
-    
-    def forward(self, x: torch.Tensor):
-        x = x + self.attn(self.attn_norm(x))
-        x = x + self.glu(self.glu_norm(x))
-        return x
-    
-class FACrossAttentionBlock(nn.Module):
-    def __init__(self, d_model: int, num_heads: int, dropout: float = 0.0):
-        super().__init__()
-
-        self.attn = MHA(d_model, num_heads, dropout)
-        self.glu = GLU(d_model, int(8/3*d_model), d_model)
-        
-        self.attn_q_norm = nn.RMSNorm(d_model)
-        self.attn_kv_norm = nn.RMSNorm(d_model) 
-        self.glu_norm = nn.RMSNorm(d_model)
-    
-    def forward(self, x_q: torch.Tensor, x_kv: torch.Tensor):
-        x = x_q + self.attn(self.attn_q_norm(x_q), self.attn_kv_norm(x_kv))
-        x = x + self.glu(self.glu_norm(x))
-        return x
+from .model_components import GLU, MHA
+from .attention_blocks import FASelfAttentionBlock, FACrossAttentionBlock
 
 
 class FATransformer(nn.Module):
@@ -50,7 +18,8 @@ class FATransformer(nn.Module):
         self.initial_temperature = initial_temperature
         self.final_temperature = final_temperature
         self.temperature = initial_temperature
-        
+        self._training_temperature = initial_temperature  # Track current training temperature
+
         self.agent_proj = nn.Linear(m, d_model, bias=True)
         self.item_proj = nn.Linear(n, d_model, bias=True)
         self.output_proj = nn.Linear(d_model, n, bias=True)
@@ -67,7 +36,15 @@ class FATransformer(nn.Module):
     def update_temperature(self, temperature: float):
         """Update the temperature parameter for softmax scaling"""
         self.temperature = temperature
-        
+        self._training_temperature = temperature
+
+    def train(self, mode: bool = True):
+        """Set model to training mode and restore training temperature"""
+        super().train(mode)
+        if mode:
+            self.temperature = self._training_temperature
+        return self
+
     def eval(self):
         """Set model to evaluation mode and use final temperature"""
         super().eval()
