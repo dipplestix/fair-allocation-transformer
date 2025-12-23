@@ -125,26 +125,26 @@ def get_rr_allocations_batch(valuation_matrices, n_permutations=5):
     # Stack all permutations: (N*n_permutations, n_agents, m_items)
     return np.concatenate(all_allocations, axis=0)
 
-def get_rr_allocations_batch_old(valuation_matrices, n_permutations=5):
+def get_rr_allocations_batch_old(valuation_matrices, n_permutations=1):
     """Generate round-robin allocations with random agent orders"""
     N, n_agents, m_items = valuation_matrices.shape
     allocation_matrices = np.zeros((N, n_agents, m_items), dtype=int)
     
     for i in range(N):
-        for _ in range(n_permutations):
-            # for now don't randomize agent order
-            agent_order = np.arange(n_agents)
-
-            # assign each agent their most preferred available item in round-robin fashion, until all items are assigned
-            taken_items = set()
-            while len(taken_items) < m_items:
-                for agent in agent_order:
-                    # get agent's preferences sorted by valuation
-                    preferences = np.argsort(-valuation_matrices[i][agent])
-                    for item in preferences:
-                        if item not in taken_items:
-                            allocation_matrices[i][agent][item] = 1
-                            taken_items.add(item)
-                            break
+        # Randomize agent order
+        agent_order = np.random.permutation(n_agents)
+        
+        # Presort preferences for all agents (descending valuation)
+        preferences = np.argsort(-valuation_matrices[i], axis=1)
+        
+        # Assign each agent their most preferred available item in round-robin fashion
+        taken_items = set()
+        while len(taken_items) < m_items:
+            for agent in agent_order:
+                for item in preferences[agent]:
+                    if item not in taken_items:
+                        allocation_matrices[i][agent][item] = 1
+                        taken_items.add(item)
+                        break
 
     return allocation_matrices
