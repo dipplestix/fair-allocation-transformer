@@ -127,15 +127,15 @@ class PoolLayer(nn.Module):
 
 
 class ExchangeableLayer(nn.Module):
-    def __init__(self, 
-                 in_channels: int, 
-                 out_channels: int, 
+    def __init__(self,
+                 in_channels: int,
+                 out_channels: int,
                  pool_config: dict = {'row': 'mean', 'column': 'mean', 'global': 'mean'},
                  activation: nn.Module = nn.GELU()):
         super().__init__()
         self.in_channels = in_channels
         self.out_channels = out_channels
-        
+
         # Calculate total number of aggregation functions
         total_aggs = 0
         for mode, agg_funcs in pool_config.items():
@@ -143,34 +143,27 @@ class ExchangeableLayer(nn.Module):
                 total_aggs += 1
             elif isinstance(agg_funcs, list):
                 total_aggs += len(agg_funcs)
-        
-        self.lin_in = in_channels + total_aggs*in_channels
+
+        proj_in_channels = in_channels + total_aggs * in_channels
 
         self.pool_layer = PoolLayer(pool_config)
-        self.proj = nn.Linear(in_channels + total_aggs*in_channels, out_channels, bias=True)
+        self.proj = nn.Conv2d(proj_in_channels, out_channels, kernel_size=1, bias=True)
         self.activation = activation
-        
-
 
     def forward(self, x: torch.Tensor):
         """
         Forward pass of the exchangeable layer.
-        
+
         Args:
             x: Input tensor of shape (batch_size, in_channels, height, width)
-        
+
         Returns:
             Tensor of shape (batch_size, out_channels, height, width)
         """
         if len(x.shape) == 3:
             x = x.unsqueeze(1)
-        B, _, n, m = x.shape
         x = self.pool_layer(x)  # Shape: (B, C + C*total_aggs, n, m)
-        # Reshape to (B, n*m, channels) for linear layer
-        x = x.permute(0, 2, 3, 1).reshape(B, n*m, self.lin_in)
-        x = self.activation(self.proj(x))  # Shape: (B, n*m, out_channels)
-        # Reshape back to (B, out_channels, n, m)
-        x = x.view(B, n, m, self.out_channels).permute(0, 3, 1, 2)
+        x = self.activation(self.proj(x))  # Shape: (B, out_channels, n, m)
         return x
     
 
