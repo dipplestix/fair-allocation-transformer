@@ -31,7 +31,7 @@ Get started in 5 minutes:
 
 ```bash
 # Clone and install
-git clone https://github.com/dipplestix/fair-allocation-transformer.git
+git clone https://github.com/<username>/fair-allocation-transformer.git
 cd fair-allocation-transformer
 
 # Install uv if not already installed
@@ -628,7 +628,6 @@ fair-allocation-transformer/
 │   ├── best_from_sweep_residual.yaml  # Best hyperparameters
 │   └── residual_30_60.yaml           # Config for 30x60 training
 │
-├── notebooks/                  # Experimental notebooks
 ├── set_transformer/            # Experimental baseline (Set Transformer)
 ├── benchmarks/                 # Performance benchmarks
 │
