@@ -14,8 +14,6 @@ from fftransformer.fftransformer_residual import FFTransformerResidual
 
 def load_model(
     checkpoint_path,
-    n=10,
-    m=20,
     d_model=256,
     num_heads=8,
     num_output_layers=2,
@@ -27,8 +25,6 @@ def load_model(
 
     Args:
         checkpoint_path: Path to .pt checkpoint file
-        n: Number of agents
-        m: Number of items
         d_model: Model dimension
         num_heads: Number of attention heads
         num_output_layers: Number of output layers
@@ -44,8 +40,6 @@ def load_model(
 
     # Create model
     model = FFTransformerResidual(
-        n=n,
-        m=m,
         d_model=d_model,
         num_heads=num_heads,
         num_output_layers=num_output_layers,

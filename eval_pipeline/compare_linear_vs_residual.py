@@ -64,7 +64,7 @@ def load_residual_model():
 
     # Parameters from the actual training run (from checkpoint config)
     model = FFTransformerResidual(
-        n=10, m=20, d_model=256, num_heads=8,
+        d_model=256, num_heads=8,
         num_output_layers=2, dropout=0.0,
         initial_temperature=1.0, final_temperature=0.01
     )

@@ -6,7 +6,7 @@ from .attention_blocks import FFSelfAttentionBlock, FFCrossAttentionBlock
 
 
 class FFTransformerResidual(nn.Module):
-    def __init__(self, n, m, d_model: int, num_heads: int, num_output_layers: int = 1,
+    def __init__(self, d_model: int, num_heads: int, num_output_layers: int = 1,
                  num_encoder_layers: int = 1, dropout: float = 0.0,
                  initial_temperature: float = 1.0, final_temperature: float = 0.01):
         super().__init__()
@@ -15,8 +15,6 @@ class FFTransformerResidual(nn.Module):
         self.num_output_layers = num_output_layers
         self.num_encoder_layers = num_encoder_layers
         self.dropout = dropout
-        self.n = n
-        self.m = m
         self.initial_temperature = initial_temperature
         self.final_temperature = final_temperature
         self.temperature = initial_temperature

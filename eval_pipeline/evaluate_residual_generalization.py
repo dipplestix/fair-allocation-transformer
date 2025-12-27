@@ -39,7 +39,7 @@ def load_residual_model():
     # Model parameters from training (n=10, m=20 was training size)
     # But the architecture is size-agnostic
     model = FFTransformerResidual(
-        n=10, m=20, d_model=256, num_heads=8,
+        d_model=256, num_heads=8,
         num_output_layers=2, dropout=0.0,
         initial_temperature=1.0, final_temperature=0.01
     )

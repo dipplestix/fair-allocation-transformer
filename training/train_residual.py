@@ -218,8 +218,6 @@ def create_model(config: Dict[str, Any], device: torch.device):
     # need to modify the class to accept pool_config as a parameter.
     # Here we use the standard FFTransformerResidual which has a fixed pool_config.
     model = FFTransformerResidual(
-        n=config['n'],
-        m=config['m'],
         d_model=config['d_model'],
         num_heads=config['num_heads'],
         num_output_layers=config['num_output_layers'],
