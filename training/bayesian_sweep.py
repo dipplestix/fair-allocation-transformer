@@ -1,5 +1,5 @@
 """
-Bayesian hyperparameter sweep for FATransformer using Weights & Biases.
+Bayesian hyperparameter sweep for FFTransformer using Weights & Biases.
 
 To create the sweep and launch an agent locally:
 

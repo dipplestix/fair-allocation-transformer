@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-Production training script for FATransformer.
+Production training script for FFTransformer.
 
 Use after identifying best hyperparameters from bayesian_sweep.py.
 Supports longer training runs, checkpointing, and resuming.
@@ -42,7 +42,7 @@ except ImportError:
 def parse_args():
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(
-        description="Production training for FATransformer"
+        description="Production training for FFTransformer"
     )
 
     # Config options

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-Export the best configuration from a Weights & Biases sweep for FATransformerResidual.
+Export the best configuration from a Weights & Biases sweep for FFTransformerResidual.
 
 This script fetches the best run from a sweep and creates a production
 training config file ready to use with training/train_residual.py.
@@ -215,7 +215,7 @@ def get_best_sweep_config(sweep_id: str, project: str, entity: str | None = None
     print(f"{'='*60}\n")
 
     # Extract config - use defensive access with fallbacks
-    # Note: FATransformerResidual has additional parameters compared to base FATransformer
+    # Note: FFTransformerResidual has additional parameters compared to base FFTransformer
     config = {
         # Model architecture
         'n': get_run_config_value(best_run, 'n', 10),
@@ -274,7 +274,7 @@ def get_best_sweep_config(sweep_id: str, project: str, entity: str | None = None
         final_residual_value = None
 
     metadata = {
-        '_model_type': 'FATransformerResidual',
+        '_model_type': 'FFTransformerResidual',
         '_sweep_id': sweep_id,
         '_sweep_url': sweep.url,
         '_best_run_id': best_run.id,
@@ -293,7 +293,7 @@ def save_config(config: dict, metadata: dict, output_path: Path):
     if HAS_YAML and (output_path.suffix in ['.yaml', '.yml']):
         # Save as YAML with comments
         with open(output_path, 'w') as f:
-            f.write(f"# Best configuration from wandb sweep for FATransformerResidual\n")
+            f.write(f"# Best configuration from wandb sweep for FFTransformerResidual\n")
             f.write(f"# Sweep ID: {metadata['_sweep_id']}\n")
             f.write(f"# Sweep URL: {metadata['_sweep_url']}\n")
             f.write(f"# Best run: {metadata['_best_run_id']}\n")
@@ -318,7 +318,7 @@ def save_config(config: dict, metadata: dict, output_path: Path):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Export best config from wandb sweep for FATransformerResidual",
+        description="Export best config from wandb sweep for FFTransformerResidual",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -361,7 +361,7 @@ Examples:
 
     # Print configuration summary
     print(f"\n{'='*60}")
-    print("Configuration Summary (FATransformerResidual)")
+    print("Configuration Summary (FFTransformerResidual)")
     print(f"{'='*60}")
     print(f"Model: n={config['n']}, m={config['m']}, d_model={config['d_model']}")
     print(f"Architecture: heads={config['num_heads']}, encoder_layers={config['num_encoder_layers']}, output_layers={config['num_output_layers']}")
