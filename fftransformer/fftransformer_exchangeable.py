@@ -34,15 +34,13 @@ class BilinearLayer(nn.Module):
 
 
 class FFTransformerExchangeable(nn.Module):
-    def __init__(self, n, m, d_model: int, num_heads: int, num_output_layers: int = 1, dropout: float = 0.0, initial_temperature: float = 1.0, final_temperature: float = 0.01):
+    def __init__(self, d_model: int, num_heads: int, num_output_layers: int = 1, dropout: float = 0.0, initial_temperature: float = 1.0, final_temperature: float = 0.01):
         super().__init__()
 
         self.d_model = d_model
         self.num_heads = num_heads
         self.num_output_layers = num_output_layers
         self.dropout = dropout
-        self.n = n
-        self.m = m
         self.initial_temperature = initial_temperature
         self.final_temperature = final_temperature
         self.temperature = initial_temperature

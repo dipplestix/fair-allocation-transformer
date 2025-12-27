@@ -45,8 +45,8 @@ uv run python -c "
 import torch
 from fftransformer import FFTransformerResidual, get_nash_welfare
 
-# Create model for 10 agents, 20 items
-model = FFTransformerResidual(n=10, m=20, d_model=256, num_heads=8, num_output_layers=2)
+# Create model (size-agnostic, works with any n agents and m items)
+model = FFTransformerResidual(d_model=256, num_heads=8, num_output_layers=2)
 
 # Generate random valuations and compute allocation
 valuations = torch.rand(4, 10, 20)  # batch of 4
@@ -467,8 +467,6 @@ EF1 repair fixes EF1 violations in any allocation:
 
 ```python
 class FFTransformerResidual(
-    n: int,                          # Number of agents
-    m: int,                          # Number of items
     d_model: int,                    # Embedding dimension
     num_heads: int,                  # Attention heads
     num_output_layers: int = 1,      # Output transformer layers
@@ -478,6 +476,8 @@ class FFTransformerResidual(
     final_temperature: float = 0.01  # Eval mode temperature
 )
 ```
+
+The model is **size-agnostic** - it works with any number of agents `n` and items `m` at inference time.
 
 **Methods**:
 
@@ -493,8 +493,8 @@ class FFTransformerResidual(
 
 **Example**:
 ```python
-model = FFTransformerResidual(n=10, m=20, d_model=256, num_heads=8, num_output_layers=2)
-valuations = torch.rand(4, 10, 20)
+model = FFTransformerResidual(d_model=256, num_heads=8, num_output_layers=2)
+valuations = torch.rand(4, 10, 20)  # 10 agents, 20 items
 allocations = model(valuations)  # (4, 20, 10)
 ```
 
@@ -628,7 +628,6 @@ fair-allocation-transformer/
 │   ├── best_from_sweep_residual.yaml  # Best hyperparameters
 │   └── residual_30_60.yaml           # Config for 30x60 training
 │
-├── set_transformer/            # Experimental baseline (Set Transformer)
 ├── benchmarks/                 # Performance benchmarks
 │
 ├── README.md                   # This file

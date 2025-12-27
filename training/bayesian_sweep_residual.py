@@ -74,12 +74,10 @@ POOL_CONFIGS = {
 class FFTransformerResidualSweep(nn.Module):
     """
     FFTransformer with exchangeable layers and residual connection from input.
-    Configurable for hyperparameter sweeps.
+    Configurable for hyperparameter sweeps. Size-agnostic (no n, m parameters).
     """
     def __init__(
         self,
-        n: int,
-        m: int,
         d_model: int,
         num_heads: int,
         num_output_layers: int = 1,
@@ -95,8 +93,6 @@ class FFTransformerResidualSweep(nn.Module):
         self.num_heads = num_heads
         self.num_output_layers = num_output_layers
         self.dropout = dropout
-        self.n = n
-        self.m = m
         self.initial_temperature = initial_temperature
         self.final_temperature = final_temperature
         self.temperature = initial_temperature
@@ -231,8 +227,6 @@ def train(config: Optional[Dict[str, Any]] = None) -> None:
         torch.manual_seed(seed)
 
         model = FFTransformerResidualSweep(
-            n=cfg.n,
-            m=cfg.m,
             d_model=cfg.d_model,
             num_heads=cfg.num_heads,
             num_output_layers=cfg.num_output_layers,
