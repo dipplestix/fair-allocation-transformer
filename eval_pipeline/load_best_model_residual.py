@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Simple model loader for evaluation of FATransformerResidual that uses standard Python imports."""
+"""Simple model loader for evaluation of FFTransformerResidual that uses standard Python imports."""
 
 import torch
 import sys
@@ -9,7 +9,7 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from fatransformer.fatransformer_residual import FATransformer as FATransformerResidual
+from fftransformer.fftransformer_residual import FFTransformerResidual
 
 
 def load_model(
@@ -23,7 +23,7 @@ def load_model(
     initial_temperature=1.0,
     final_temperature=0.01,
 ):
-    """Load FATransformerResidual model from checkpoint.
+    """Load FFTransformerResidual model from checkpoint.
 
     Args:
         checkpoint_path: Path to .pt checkpoint file
@@ -37,13 +37,13 @@ def load_model(
         final_temperature: Final temperature (used in eval mode)
 
     Returns:
-        model: Loaded FATransformerResidual model in eval mode
+        model: Loaded FFTransformerResidual model in eval mode
         model_name: Name for the model
     """
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # Create model
-    model = FATransformerResidual(
+    model = FFTransformerResidual(
         n=n,
         m=m,
         d_model=d_model,

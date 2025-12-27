@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Evaluate Residual FATransformer on datasets with different agent counts (n).
+Evaluate Residual FFTransformer on datasets with different agent counts (n).
 Tests generalization beyond the training distribution (n=10, m=20).
 
 Usage:
@@ -31,14 +31,14 @@ from utils.inference import get_model_allocations_batch
 
 
 def load_residual_model():
-    """Load the residual FATransformer model (trained on n=10, m=20)."""
-    from fatransformer.fatransformer_residual import FATransformer as FATransformerResidual
+    """Load the residual FFTransformer model (trained on n=10, m=20)."""
+    from fftransformer.fftransformer_residual import FFTransformerResidual
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # Model parameters from training (n=10, m=20 was training size)
     # But the architecture is size-agnostic
-    model = FATransformerResidual(
+    model = FFTransformerResidual(
         n=10, m=20, d_model=256, num_heads=8,
         num_output_layers=2, dropout=0.0,
         initial_temperature=1.0, final_temperature=0.01
@@ -118,7 +118,7 @@ def evaluate_dataset(model, data_file, batch_size=100, apply_ef1_repair=False,
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Evaluate Residual FATransformer on any dataset size')
+    parser = argparse.ArgumentParser(description='Evaluate Residual FFTransformer on any dataset size')
     parser.add_argument('dataset', type=str, help='Path to dataset .npz file')
     parser.add_argument('--batch_size', type=int, default=100, help='Batch size for evaluation')
     parser.add_argument('--max_samples', type=int, default=None, help='Maximum samples to evaluate')
@@ -132,7 +132,7 @@ def main():
         sys.exit(1)
 
     # Load model once
-    print("Loading Residual FATransformer model...")
+    print("Loading Residual FFTransformer model...")
     print("  (trained on n=10, m=20)")
     model = load_residual_model()
     print(f"  Model loaded: {sum(p.numel() for p in model.parameters()):,} parameters")

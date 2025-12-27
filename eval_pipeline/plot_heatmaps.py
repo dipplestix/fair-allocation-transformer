@@ -39,7 +39,7 @@ def load_and_plot(data_file, output_dir='results', suffix='', title_suffix=''):
     output_path.mkdir(parents=True, exist_ok=True)
 
     # Determine title based on data or override
-    base_title = title_suffix if title_suffix else 'Residual FATransformer'
+    base_title = title_suffix if title_suffix else 'Residual FFTransformer'
 
     # Plot utility heatmap
     fig, ax = plt.subplots(figsize=(12, 10))

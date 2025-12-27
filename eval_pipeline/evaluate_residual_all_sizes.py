@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Evaluate Residual FATransformer on all dataset sizes (10_10 through 10_30).
+Evaluate Residual FFTransformer on all dataset sizes (10_10 through 10_30).
 Creates comprehensive plots of the results.
 
 Usage:
@@ -34,13 +34,13 @@ from utils.inference import get_model_allocations_batch
 
 
 def load_residual_model():
-    """Load the residual FATransformer model."""
-    from fatransformer.fatransformer_residual import FATransformer as FATransformerResidual
+    """Load the residual FFTransformer model."""
+    from fftransformer.fftransformer_residual import FFTransformerResidual
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # Parameters from the actual training run
-    model = FATransformerResidual(
+    model = FFTransformerResidual(
         n=10, m=20, d_model=256, num_heads=8,
         num_output_layers=2, dropout=0.0,
         initial_temperature=1.0, final_temperature=0.01
@@ -134,7 +134,7 @@ def create_plots(results_df, output_dir):
 
     # Main comparison plot (2x3 grid)
     fig, axes = plt.subplots(2, 3, figsize=(16, 10))
-    fig.suptitle('Residual FATransformer Performance Across Dataset Sizes\n(n=10 agents, varying items)',
+    fig.suptitle('Residual FFTransformer Performance Across Dataset Sizes\n(n=10 agents, varying items)',
                  fontsize=14, fontweight='bold')
 
     metrics = [
@@ -248,7 +248,7 @@ def create_plots(results_df, output_dir):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Evaluate Residual FATransformer on all dataset sizes')
+    parser = argparse.ArgumentParser(description='Evaluate Residual FFTransformer on all dataset sizes')
     parser.add_argument('--batch_size', type=int, default=100, help='Batch size for evaluation')
     parser.add_argument('--max_samples', type=int, default=None, help='Maximum samples per dataset')
     parser.add_argument('--ef1_repair_passes', type=int, default=10, help='Max EF1 repair passes')
@@ -260,7 +260,7 @@ def main():
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # Load model once
-    print("Loading Residual FATransformer model...")
+    print("Loading Residual FFTransformer model...")
     model = load_residual_model()
     print(f"Model loaded: {sum(p.numel() for p in model.parameters()):,} parameters")
 

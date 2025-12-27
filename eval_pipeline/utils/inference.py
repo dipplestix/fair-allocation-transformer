@@ -19,7 +19,7 @@ def get_model_allocations_batch(model, valuation_matrices, apply_ef1_repair=Fals
     """Get model allocations for a batch of valuation matrices with optional EF1 repair.
 
     Args:
-        model: Trained FATransformer model
+        model: Trained FFTransformer model
         valuation_matrices: (N, n_agents, m_items) valuation matrices
         apply_ef1_repair: Whether to apply EF1 quick repair post-processing
         ef1_repair_params: Dict of parameters for EF1 repair (e.g., {'max_passes': 10})

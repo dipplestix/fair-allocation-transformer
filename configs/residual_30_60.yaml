@@ -1,4 +1,4 @@
-# Configuration for FATransformerResidual trained on n=30, m=60
+# Configuration for FFTransformerResidual trained on n=30, m=60
 # Based on best sweep config, adapted for larger problem size
 #
 # To train:

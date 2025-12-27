@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Compare Residual FATransformer + EF1 repair against baselines (Random, Random+EF1, RR).
+Compare Residual FFTransformer + EF1 repair against baselines (Random, Random+EF1, RR).
 
 Usage:
     python eval_pipeline/compare_residual_vs_baselines.py

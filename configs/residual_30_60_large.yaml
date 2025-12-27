@@ -1,4 +1,4 @@
-# Configuration for FATransformerResidual trained on n=30, m=60
+# Configuration for FFTransformerResidual trained on n=30, m=60
 # Large model with d_model=256 to match 10x20 model parameter count (~3.9M params)
 #
 # To train:

@@ -9,10 +9,10 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from fatransformer.fatransformer import FATransformer
+from fftransformer.fftransformer import FFTransformer
 
 def load_model(checkpoint_path, n=10, m=20, d_model=768, num_heads=16, num_output_layers=5, dropout=0.008020981126192437):
-    """Load FATransformer model from checkpoint.
+    """Load FFTransformer model from checkpoint.
 
     Args:
         checkpoint_path: Path to .pt checkpoint file
@@ -24,13 +24,13 @@ def load_model(checkpoint_path, n=10, m=20, d_model=768, num_heads=16, num_outpu
         dropout: Dropout rate
 
     Returns:
-        model: Loaded FATransformer model in eval mode
+        model: Loaded FFTransformer model in eval mode
         model_name: Name for the model
     """
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # Create model
-    model = FATransformer(
+    model = FFTransformer(
         n=n,
         m=m,
         d_model=d_model,

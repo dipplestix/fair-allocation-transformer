@@ -2,20 +2,10 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from .exchangeable_layer import ExchangeableLayer
-from .attention_blocks import FASelfAttentionBlock, FACrossAttentionBlock
+from .attention_blocks import FFSelfAttentionBlock, FFCrossAttentionBlock
 
 
-class FATransformer(nn.Module):
-    """
-    FATransformer with exchangeable layers and residual connection from input.
-
-    This variant adds a learnable residual connection from the raw input valuations
-    to the output, which significantly improves performance while maintaining
-    size-agnostic properties.
-
-    Achieves ~95% of the performance of the fixed-size linear model while
-    being able to handle any input size without retraining.
-    """
+class FFTransformerResidual(nn.Module):
     def __init__(self, n, m, d_model: int, num_heads: int, num_output_layers: int = 1,
                  num_encoder_layers: int = 1, dropout: float = 0.0,
                  initial_temperature: float = 1.0, final_temperature: float = 0.01):
@@ -39,14 +29,14 @@ class FATransformer(nn.Module):
         self.residual_scale = nn.Parameter(torch.tensor(0.1))
 
         self.agent_transformer = nn.ModuleList(
-            [FASelfAttentionBlock(d_model, num_heads, dropout) for _ in range(num_encoder_layers)]
+            [FFSelfAttentionBlock(d_model, num_heads, dropout) for _ in range(num_encoder_layers)]
         )
         self.item_transformer = nn.ModuleList(
-            [FASelfAttentionBlock(d_model, num_heads, dropout) for _ in range(num_encoder_layers)]
+            [FFSelfAttentionBlock(d_model, num_heads, dropout) for _ in range(num_encoder_layers)]
         )
-        self.item_agent_transformer = FACrossAttentionBlock(d_model, num_heads, dropout)
+        self.item_agent_transformer = FFCrossAttentionBlock(d_model, num_heads, dropout)
         self.output_transformer = nn.ModuleList(
-            [FASelfAttentionBlock(d_model, num_heads, dropout) for _ in range(num_output_layers)]
+            [FFSelfAttentionBlock(d_model, num_heads, dropout) for _ in range(num_output_layers)]
         )
         self.o_norm = nn.RMSNorm(d_model)
 

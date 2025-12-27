@@ -50,8 +50,8 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from fatransformer.fatransformer import FATransformer  # noqa: E402
-from fatransformer.helpers import get_nash_welfare  # noqa: E402
+from fftransformer.fftransformer import FFTransformer  # noqa: E402
+from fftransformer.helpers import get_nash_welfare  # noqa: E402
 
 
 DEFAULT_PROJECT = os.environ.get("WANDB_PROJECT", "fa-transformer-sweep")
@@ -106,7 +106,7 @@ def train(config: Optional[Dict[str, Any]] = None) -> None:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         torch.manual_seed(cfg.get("seed", 0))
 
-        model = FATransformer(
+        model = FFTransformer(
             n=cfg.n,
             m=cfg.m,
             d_model=cfg.d_model,

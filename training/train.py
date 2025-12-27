@@ -29,8 +29,8 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from fatransformer.fatransformer import FATransformer  # noqa: E402
-from fatransformer.helpers import get_nash_welfare  # noqa: E402
+from fftransformer.fftransformer import FFTransformer  # noqa: E402
+from fftransformer.helpers import get_nash_welfare  # noqa: E402
 
 try:
     import wandb
@@ -212,7 +212,7 @@ def train(config: Dict[str, Any]):
         print("Warning: wandb not installed. Install with: pip install wandb")
 
     # Create model
-    model = FATransformer(
+    model = FFTransformer(
         n=config['n'],
         m=config['m'],
         d_model=config['d_model'],

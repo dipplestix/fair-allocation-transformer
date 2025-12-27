@@ -1,5 +1,5 @@
 """
-Bayesian hyperparameter sweep for FATransformerResidual using Weights & Biases.
+Bayesian hyperparameter sweep for FFTransformerResidual using Weights & Biases.
 
 To create the sweep and launch an agent locally:
 
@@ -52,9 +52,9 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from fatransformer.exchangeable_layer import ExchangeableLayer  # noqa: E402
-from fatransformer.attention_blocks import FASelfAttentionBlock, FACrossAttentionBlock  # noqa: E402
-from fatransformer.helpers import get_nash_welfare  # noqa: E402
+from fftransformer.exchangeable_layer import ExchangeableLayer  # noqa: E402
+from fftransformer.attention_blocks import FFSelfAttentionBlock, FFCrossAttentionBlock  # noqa: E402
+from fftransformer.helpers import get_nash_welfare  # noqa: E402
 
 
 DEFAULT_PROJECT = os.environ.get("WANDB_PROJECT", "fa-transformer-residual-sweep")
@@ -71,9 +71,9 @@ POOL_CONFIGS = {
 }
 
 
-class FATransformerResidualSweep(nn.Module):
+class FFTransformerResidualSweep(nn.Module):
     """
-    FATransformer with exchangeable layers and residual connection from input.
+    FFTransformer with exchangeable layers and residual connection from input.
     Configurable for hyperparameter sweeps.
     """
     def __init__(
@@ -110,14 +110,14 @@ class FATransformerResidualSweep(nn.Module):
 
         # Encoder layers (can be deeper)
         self.agent_transformer = nn.ModuleList(
-            [FASelfAttentionBlock(d_model, num_heads, dropout) for _ in range(num_encoder_layers)]
+            [FFSelfAttentionBlock(d_model, num_heads, dropout) for _ in range(num_encoder_layers)]
         )
         self.item_transformer = nn.ModuleList(
-            [FASelfAttentionBlock(d_model, num_heads, dropout) for _ in range(num_encoder_layers)]
+            [FFSelfAttentionBlock(d_model, num_heads, dropout) for _ in range(num_encoder_layers)]
         )
-        self.item_agent_transformer = FACrossAttentionBlock(d_model, num_heads, dropout)
+        self.item_agent_transformer = FFCrossAttentionBlock(d_model, num_heads, dropout)
         self.output_transformer = nn.ModuleList(
-            [FASelfAttentionBlock(d_model, num_heads, dropout) for _ in range(num_output_layers)]
+            [FFSelfAttentionBlock(d_model, num_heads, dropout) for _ in range(num_output_layers)]
         )
         self.o_norm = nn.RMSNorm(d_model)
 
@@ -230,7 +230,7 @@ def train(config: Optional[Dict[str, Any]] = None) -> None:
         seed = cfg.get("seed", 0)
         torch.manual_seed(seed)
 
-        model = FATransformerResidualSweep(
+        model = FFTransformerResidualSweep(
             n=cfg.n,
             m=cfg.m,
             d_model=cfg.d_model,

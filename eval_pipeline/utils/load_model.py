@@ -8,14 +8,14 @@ import sys
 def load_helper_module(module_path, module_name):
     # Add project root to sys.path for package imports
     module_dir = os.path.dirname(os.path.abspath(module_path))
-    # Go up one directory to get project root (fatransformer/ -> project_root/)
+    # Go up one directory to get project root (fftransformer/ -> project_root/)
     project_root = os.path.dirname(module_dir)
 
     if project_root not in sys.path:
         sys.path.insert(0, project_root)
 
     # Import as package module to support relative imports
-    # e.g., "fatransformer.fatransformer" instead of just the file
+    # e.g., "fftransformer.fftransformer" instead of just the file
     import importlib
     try:
         # Try to import as a package module first
@@ -55,13 +55,13 @@ def load_model(model_config):
         raise ValueError(f"Model file {model_weights_file} not found")
 
     # load helper files
-    module_name = "fatransformer"
+    module_name = "fftransformer"
     module_path = config["model_def_path"]
-    fatransformer = load_helper_module(module_path, module_name)
+    fftransformer = load_helper_module(module_path, module_name)
 
     # dynamically get model class
     try:
-        ModelClass = getattr(fatransformer, config["model_class_def"])
+        ModelClass = getattr(fftransformer, config["model_class_def"])
     except AttributeError:
         raise ValueError(f"Class {config['model_class_def']} not found in {module_path}")
    

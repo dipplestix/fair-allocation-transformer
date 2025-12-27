@@ -2,10 +2,10 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from .model_components import GLU, MHA
-from .attention_blocks import FASelfAttentionBlock, FACrossAttentionBlock
+from .attention_blocks import FFSelfAttentionBlock, FFCrossAttentionBlock
 
 
-class FATransformer(nn.Module):
+class FFTransformer(nn.Module):
     def __init__(self, n, m, d_model: int, num_heads: int, num_output_layers: int = 1, dropout: float = 0.0, initial_temperature: float = 1.0, final_temperature: float = 0.01):
         super().__init__()
 
@@ -24,11 +24,11 @@ class FATransformer(nn.Module):
         self.item_proj = nn.Linear(n, d_model, bias=True)
         self.output_proj = nn.Linear(d_model, n, bias=True)
 
-        self.agent_transformer = FASelfAttentionBlock(d_model, num_heads, dropout)
-        self.item_transformer = FASelfAttentionBlock(d_model, num_heads, dropout)
-        self.item_agent_transformer = FACrossAttentionBlock(d_model, num_heads, dropout)
+        self.agent_transformer = FFSelfAttentionBlock(d_model, num_heads, dropout)
+        self.item_transformer = FFSelfAttentionBlock(d_model, num_heads, dropout)
+        self.item_agent_transformer = FFCrossAttentionBlock(d_model, num_heads, dropout)
         self.output_transformer = nn.ModuleList(
-            [FASelfAttentionBlock(d_model, num_heads, dropout) for _ in range(num_output_layers)]
+            [FFSelfAttentionBlock(d_model, num_heads, dropout) for _ in range(num_output_layers)]
         )
 
         self.o_norm = nn.RMSNorm(d_model)

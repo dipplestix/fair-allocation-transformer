@@ -1,6 +1,6 @@
 import torch.nn as nn
 import torch
-from .attention_blocks import FASelfAttentionBlock
+from .attention_blocks import FFSelfAttentionBlock
 
 
 class PoolLayer(nn.Module):
@@ -191,7 +191,7 @@ class AxisAttnPool1D(nn.Module):
 class AxisSelfAttention1D(nn.Module):
     def __init__(self, d_model, num_heads, dropout=0.0):
         super().__init__()
-        self.block = FASelfAttentionBlock(d_model, num_heads, dropout)
+        self.block = FFSelfAttentionBlock(d_model, num_heads, dropout)
 
     def forward(self, x):                  # x: (B, D, H, W)
         B, D, H, W = x.shape

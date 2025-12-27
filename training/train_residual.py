@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-Production training script for FATransformerResidual.
+Production training script for FFTransformerResidual.
 
 Use after identifying best hyperparameters from bayesian_sweep_residual.py.
 Supports longer training runs, checkpointing, and resuming.
@@ -29,8 +29,8 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from fatransformer.fatransformer_residual import FATransformer as FATransformerResidual  # noqa: E402
-from fatransformer.helpers import get_nash_welfare  # noqa: E402
+from fftransformer.fftransformer_residual import FFTransformerResidual  # noqa: E402
+from fftransformer.helpers import get_nash_welfare  # noqa: E402
 
 try:
     import wandb
@@ -52,7 +52,7 @@ POOL_CONFIGS = {
 def parse_args():
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(
-        description="Production training for FATransformerResidual"
+        description="Production training for FFTransformerResidual"
     )
 
     # Config options
@@ -152,7 +152,7 @@ def save_checkpoint(
         'config': config,
         'best_metric': best_metric,
         'rng_state': torch.get_rng_state(),
-        'model_type': 'FATransformerResidual',
+        'model_type': 'FFTransformerResidual',
     }, checkpoint_path)
 
     # Clean up old checkpoints
@@ -208,16 +208,16 @@ def validate(model, n, m, val_size, device, temperature=None):
 
 
 def create_model(config: Dict[str, Any], device: torch.device):
-    """Create FATransformerResidual model from config."""
+    """Create FFTransformerResidual model from config."""
     # Get pool config
     pool_config_name = config.get('pool_config_name', 'row_col')
     pool_config = POOL_CONFIGS.get(pool_config_name, POOL_CONFIGS['row_col'])
 
-    # Note: The production FATransformerResidual class uses a fixed pool_config
-    # from the fatransformer_residual.py file. For the sweep version, we would
+    # Note: The production FFTransformerResidual class uses a fixed pool_config
+    # from the fftransformer_residual.py file. For the sweep version, we would
     # need to modify the class to accept pool_config as a parameter.
-    # Here we use the standard FATransformerResidual which has a fixed pool_config.
-    model = FATransformerResidual(
+    # Here we use the standard FFTransformerResidual which has a fixed pool_config.
+    model = FFTransformerResidual(
         n=config['n'],
         m=config['m'],
         d_model=config['d_model'],
@@ -361,7 +361,7 @@ def train(config: Dict[str, Any]):
                     'config': config,
                     'best_metric': best_metric,
                     'rng_state': torch.get_rng_state(),
-                    'model_type': 'FATransformerResidual',
+                    'model_type': 'FFTransformerResidual',
                 }, best_checkpoint_path)
 
                 # Also save just the model weights for easy inference

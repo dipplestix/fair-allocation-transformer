@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Compare Linear FATransformer vs Residual FATransformer performance.
+Compare Linear FFTransformer vs Residual FFTransformer performance.
 
 This script evaluates both models (with and without EF1 repair) on a dataset
 and generates comparison plots.
@@ -37,12 +37,12 @@ from utils.ef1_repair import ef1_quick_repair_batch
 
 
 def load_linear_model():
-    """Load the linear FATransformer model."""
-    from fatransformer.fatransformer import FATransformer
+    """Load the linear FFTransformer model."""
+    from fftransformer.fftransformer import FFTransformer
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    model = FATransformer(
+    model = FFTransformer(
         n=10, m=20, d_model=768, num_heads=16,
         num_output_layers=4, dropout=0.008020981126192437,
         initial_temperature=1.0, final_temperature=0.01
@@ -57,13 +57,13 @@ def load_linear_model():
 
 
 def load_residual_model():
-    """Load the residual FATransformer model."""
-    from fatransformer.fatransformer_residual import FATransformer as FATransformerResidual
+    """Load the residual FFTransformer model."""
+    from fftransformer.fftransformer_residual import FFTransformerResidual
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # Parameters from the actual training run (from checkpoint config)
-    model = FATransformerResidual(
+    model = FFTransformerResidual(
         n=10, m=20, d_model=256, num_heads=8,
         num_output_layers=2, dropout=0.0,
         initial_temperature=1.0, final_temperature=0.01
@@ -147,7 +147,7 @@ def create_comparison_plot(results_df, output_path):
     }
 
     fig, axes = plt.subplots(2, 3, figsize=(16, 10))
-    fig.suptitle('Linear vs Residual FATransformer Comparison', fontsize=16, fontweight='bold')
+    fig.suptitle('Linear vs Residual FFTransformer Comparison', fontsize=16, fontweight='bold')
 
     models = ['Linear', 'Linear+EF1', 'Residual', 'Residual+EF1']
 
@@ -210,7 +210,7 @@ def create_comparison_plot(results_df, output_path):
 def print_summary_table(summary_df):
     """Print a formatted summary table."""
     print("\n" + "="*80)
-    print("COMPARISON SUMMARY: Linear vs Residual FATransformer")
+    print("COMPARISON SUMMARY: Linear vs Residual FFTransformer")
     print("="*80)
     print(f"{'Model':<15} {'EF%':<8} {'EF1%':<8} {'EFx%':<8} {'Util%':<10} {'Nash%':<10} {'Time(ms)':<10}")
     print("-"*80)
@@ -240,7 +240,7 @@ def print_summary_table(summary_df):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Compare Linear vs Residual FATransformer')
+    parser = argparse.ArgumentParser(description='Compare Linear vs Residual FFTransformer')
     parser.add_argument('data_file', help='Input .npz dataset file')
     parser.add_argument('--batch_size', type=int, default=100, help='Batch size for evaluation')
     parser.add_argument('--max_samples', type=int, default=None, help='Maximum samples to evaluate')

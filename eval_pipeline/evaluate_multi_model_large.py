@@ -31,10 +31,10 @@ from utils.ef1_repair import ef1_quick_repair_batch
 
 
 def load_model(checkpoint_path, device, d_model):
-    """Load a FATransformerResidual model from checkpoint."""
-    from fatransformer.fatransformer_residual import FATransformer as FATransformerResidual
+    """Load a FFTransformerResidual model from checkpoint."""
+    from fftransformer.fftransformer_residual import FFTransformerResidual
 
-    model = FATransformerResidual(
+    model = FFTransformerResidual(
         n=10, m=20, d_model=d_model, num_heads=8,
         num_output_layers=2, dropout=0.0,
         initial_temperature=1.0, final_temperature=0.01

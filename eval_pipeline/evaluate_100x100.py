@@ -25,12 +25,12 @@ from utils.ef1_repair import ef1_quick_repair_batch
 
 
 def load_residual_model():
-    """Load the residual FATransformer model."""
-    from fatransformer.fatransformer_residual import FATransformer as FATransformerResidual
+    """Load the residual FFTransformer model."""
+    from fftransformer.fftransformer_residual import FFTransformerResidual
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    model = FATransformerResidual(
+    model = FFTransformerResidual(
         n=10, m=20, d_model=256, num_heads=8,
         num_output_layers=2, dropout=0.0,
         initial_temperature=1.0, final_temperature=0.01
