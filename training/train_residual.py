@@ -1,0 +1,438 @@
+#!/usr/bin/env python
+"""
+Production training script for FATransformerResidual.
+
+Use after identifying best hyperparameters from bayesian_sweep_residual.py.
+Supports longer training runs, checkpointing, and resuming.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import sys
+from pathlib import Path
+from typing import Any, Dict
+
+import torch
+import torch.optim as optim
+
+try:
+    import yaml
+    HAS_YAML = True
+except ImportError:
+    HAS_YAML = False
+
+# Ensure local imports work
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from fatransformer.fatransformer_residual import FATransformer as FATransformerResidual  # noqa: E402
+from fatransformer.helpers import get_nash_welfare  # noqa: E402
+
+try:
+    import wandb
+    HAS_WANDB = True
+except ImportError:
+    HAS_WANDB = False
+
+
+# Pool config options (same as in bayesian_sweep_residual.py)
+POOL_CONFIGS = {
+    "row_only": {'row': ['mean', 'max', 'min'], 'column': [], 'global': []},
+    "row_col": {'row': ['mean', 'max', 'min'], 'column': ['mean', 'max', 'min'], 'global': []},
+    "row_global": {'row': ['mean', 'max', 'min'], 'column': [], 'global': ['mean', 'max', 'min']},
+    "all": {'row': ['mean', 'max', 'min'], 'column': ['mean', 'max', 'min'], 'global': ['mean', 'max', 'min']},
+    "row_col_mean": {'row': 'mean', 'column': 'mean', 'global': []},
+}
+
+
+def parse_args():
+    """Parse command-line arguments."""
+    parser = argparse.ArgumentParser(
+        description="Production training for FATransformerResidual"
+    )
+
+    # Config options
+    parser.add_argument("--config", type=str, help="Path to YAML/JSON config file")
+    parser.add_argument("--resume", type=str, help="Path to checkpoint to resume from")
+
+    # Model hyperparameters (can override config)
+    parser.add_argument("--n", type=int, default=10, help="Number of agents")
+    parser.add_argument("--m", type=int, default=20, help="Number of items")
+    parser.add_argument("--d-model", type=int, default=256, help="Model dimension")
+    parser.add_argument("--num-heads", type=int, default=8, help="Number of attention heads")
+    parser.add_argument("--num-output-layers", type=int, default=2, help="Number of output layers")
+    parser.add_argument("--num-encoder-layers", type=int, default=1, help="Number of encoder layers")
+    parser.add_argument("--dropout", type=float, default=0.0, help="Dropout rate")
+
+    # Residual-specific parameters
+    parser.add_argument("--pool-config-name", type=str, default="row_col",
+                       choices=list(POOL_CONFIGS.keys()),
+                       help="Pool configuration name")
+    parser.add_argument("--residual-scale-init", type=float, default=0.1,
+                       help="Initial residual scale value")
+
+    # Training hyperparameters
+    parser.add_argument("--lr", type=float, default=1e-4, help="Learning rate")
+    parser.add_argument("--weight-decay", type=float, default=1e-2, help="Weight decay")
+    parser.add_argument("--batch-size", type=int, default=512, help="Batch size")
+    parser.add_argument("--steps", type=int, default=100000, help="Total training steps")
+
+    # Temperature
+    parser.add_argument("--initial-temperature", type=float, default=1.0)
+    parser.add_argument("--final-temperature", type=float, default=0.01)
+
+    # Training settings
+    parser.add_argument("--grad-clip-norm", type=float, default=1.0, help="Gradient clipping")
+    parser.add_argument("--seed", type=int, default=0, help="Random seed")
+
+    # Checkpointing
+    parser.add_argument("--checkpoint-dir", type=str, default="checkpoints/residual",
+                       help="Directory to save checkpoints")
+    parser.add_argument("--checkpoint-every", type=int, default=5000,
+                       help="Save checkpoint every N steps")
+    parser.add_argument("--keep-checkpoints", type=int, default=3,
+                       help="Number of recent checkpoints to keep")
+
+    # Validation
+    parser.add_argument("--val-every", type=int, default=1000,
+                       help="Validate every N steps")
+    parser.add_argument("--val-size", type=int, default=1000,
+                       help="Number of validation examples")
+
+    # Early stopping
+    parser.add_argument("--patience", type=int, default=50,
+                       help="Early stopping patience")
+    parser.add_argument("--min-delta", type=float, default=1e-5,
+                       help="Minimum improvement for early stopping")
+
+    # Wandb
+    parser.add_argument("--wandb-project", type=str, default="fa-transformer-residual-production")
+    parser.add_argument("--wandb-entity", type=str, default=None)
+    parser.add_argument("--run-name", type=str, default=None, help="Wandb run name")
+    parser.add_argument("--no-wandb", action="store_true", help="Disable wandb logging")
+
+    return parser.parse_args()
+
+
+def load_config(config_path: str) -> Dict[str, Any]:
+    """Load config from YAML or JSON file."""
+    with open(config_path) as f:
+        if config_path.endswith('.yaml') or config_path.endswith('.yml'):
+            if not HAS_YAML:
+                raise ImportError("PyYAML is required for YAML config files. Install with: pip install pyyaml")
+            return yaml.safe_load(f)
+        else:
+            return json.load(f)
+
+
+def save_checkpoint(
+    checkpoint_dir: Path,
+    step: int,
+    model: torch.nn.Module,
+    optimizer: torch.optim.Optimizer,
+    scheduler: Any,
+    config: Dict[str, Any],
+    best_metric: float,
+    keep_last: int = 3,
+):
+    """Save training checkpoint and manage checkpoint cleanup."""
+    checkpoint_dir.mkdir(parents=True, exist_ok=True)
+
+    checkpoint_path = checkpoint_dir / f"checkpoint_{step:07d}.pt"
+
+    torch.save({
+        'step': step,
+        'model_state_dict': model.state_dict(),
+        'optimizer_state_dict': optimizer.state_dict(),
+        'scheduler_state_dict': scheduler.state_dict(),
+        'config': config,
+        'best_metric': best_metric,
+        'rng_state': torch.get_rng_state(),
+        'model_type': 'FATransformerResidual',
+    }, checkpoint_path)
+
+    # Clean up old checkpoints
+    checkpoints = sorted(checkpoint_dir.glob("checkpoint_*.pt"))
+    if len(checkpoints) > keep_last:
+        for old_ckpt in checkpoints[:-keep_last]:
+            old_ckpt.unlink()
+
+    print(f"Saved checkpoint: {checkpoint_path}")
+    return checkpoint_path
+
+
+def load_checkpoint(checkpoint_path: str):
+    """Load checkpoint for resuming training."""
+    return torch.load(checkpoint_path)
+
+
+def validate(model, n, m, val_size, device, temperature=None):
+    """Run validation on fixed validation set.
+
+    Args:
+        model: The model to validate
+        n: Number of agents
+        m: Number of items
+        val_size: Validation set size
+        device: Device to run on
+        temperature: Temperature to use for validation. If None, uses current training temperature.
+    """
+    # Save current training state
+    was_training = model.training
+    current_temp = model.temperature
+
+    # Set to eval mode if specified temperature, otherwise keep in training mode
+    if temperature is not None:
+        model.eval()
+        model.temperature = temperature
+
+    with torch.no_grad():
+        val_valuations = torch.rand(val_size, n, m, device=device)
+        val_allocations = model(val_valuations)
+        val_nash_welfare = get_nash_welfare(
+            val_valuations, val_allocations, reduction="mean"
+        )
+
+    # Restore original state
+    if was_training:
+        model.train()
+    else:
+        model.eval()
+    model.temperature = current_temp
+
+    return val_nash_welfare.item()
+
+
+def create_model(config: Dict[str, Any], device: torch.device):
+    """Create FATransformerResidual model from config."""
+    # Get pool config
+    pool_config_name = config.get('pool_config_name', 'row_col')
+    pool_config = POOL_CONFIGS.get(pool_config_name, POOL_CONFIGS['row_col'])
+
+    # Note: The production FATransformerResidual class uses a fixed pool_config
+    # from the fatransformer_residual.py file. For the sweep version, we would
+    # need to modify the class to accept pool_config as a parameter.
+    # Here we use the standard FATransformerResidual which has a fixed pool_config.
+    model = FATransformerResidual(
+        n=config['n'],
+        m=config['m'],
+        d_model=config['d_model'],
+        num_heads=config['num_heads'],
+        num_output_layers=config['num_output_layers'],
+        num_encoder_layers=config.get('num_encoder_layers', 1),
+        dropout=config['dropout'],
+        initial_temperature=config['initial_temperature'],
+        final_temperature=config['final_temperature'],
+    ).to(device)
+
+    # Override residual scale init if specified
+    residual_scale_init = config.get('residual_scale_init', 0.1)
+    with torch.no_grad():
+        model.residual_scale.fill_(residual_scale_init)
+
+    return model
+
+
+def train(config: Dict[str, Any]):
+    """Main training loop."""
+
+    # Setup
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Using device: {device}")
+
+    torch.manual_seed(config['seed'])
+
+    checkpoint_dir = Path(config['checkpoint_dir'])
+
+    # Initialize wandb
+    use_wandb = HAS_WANDB and not config.get('no_wandb')
+    if use_wandb:
+        wandb.init(
+            project=config['wandb_project'],
+            entity=config.get('wandb_entity'),
+            name=config.get('run_name'),
+            config=config,
+        )
+    elif not HAS_WANDB and not config.get('no_wandb'):
+        print("Warning: wandb not installed. Install with: pip install wandb")
+
+    # Create model
+    model = create_model(config, device)
+
+    print(f"Model created: {sum(p.numel() for p in model.parameters())} parameters")
+    print(f"Residual scale init: {model.residual_scale.item():.4f}")
+
+    # Optimizer and scheduler
+    optimizer = optim.AdamW(
+        model.parameters(),
+        lr=config['lr'],
+        weight_decay=config['weight_decay']
+    )
+    scheduler = optim.lr_scheduler.CosineAnnealingLR(
+        optimizer, T_max=config['steps']
+    )
+
+    # Resume from checkpoint if specified
+    start_step = 0
+    best_metric = float('-inf')
+    if config.get('resume'):
+        print(f"Resuming from checkpoint: {config['resume']}")
+        ckpt = load_checkpoint(config['resume'])
+        model.load_state_dict(ckpt['model_state_dict'])
+        optimizer.load_state_dict(ckpt['optimizer_state_dict'])
+        scheduler.load_state_dict(ckpt['scheduler_state_dict'])
+        torch.set_rng_state(ckpt['rng_state'])
+        start_step = ckpt['step'] + 1
+        best_metric = ckpt['best_metric']
+        print(f"Resumed from step {start_step}, best metric: {best_metric:.6f}")
+
+    # Early stopping
+    steps_without_improvement = 0
+
+    # Training loop
+    print(f"Starting training for {config['steps']} steps...")
+    for step in range(start_step, config['steps']):
+        model.train()
+
+        # Update temperature with cosine annealing (starts high, ends low)
+        progress = step / config['steps']
+        current_temp = config['final_temperature'] + \
+            (config['initial_temperature'] - config['final_temperature']) * \
+            (1 + torch.cos(torch.tensor(torch.pi * progress))) / 2
+        model.update_temperature(current_temp.item())
+
+        # Generate batch
+        valuations = torch.rand(
+            config['batch_size'], config['n'], config['m'], device=device
+        )
+
+        # Forward pass
+        allocation = model(valuations)
+        nash_welfare = get_nash_welfare(
+            valuations, allocation, reduction="mean"
+        )
+        loss = -nash_welfare
+
+        # Backward pass
+        optimizer.zero_grad()
+        loss.backward()
+        if config.get('grad_clip_norm'):
+            torch.nn.utils.clip_grad_norm_(
+                model.parameters(), max_norm=config['grad_clip_norm']
+            )
+        optimizer.step()
+        scheduler.step()
+
+        # Logging
+        metrics = {
+            "step": step,
+            "loss": loss.item(),
+            "nash_welfare": nash_welfare.item(),
+            "lr": scheduler.get_last_lr()[0],
+            "temperature": current_temp.item(),
+            "residual_scale": model.residual_scale.item(),
+        }
+
+        # Validation
+        if step % config['val_every'] == 0:
+            val_nw = validate(
+                model, config['n'], config['m'],
+                config['val_size'], device
+            )
+            metrics['val_nash_welfare'] = val_nw
+
+            # Check for improvement
+            if val_nw > best_metric + config['min_delta']:
+                best_metric = val_nw
+                steps_without_improvement = 0
+
+                # Save best model as full checkpoint (for resuming training)
+                best_checkpoint_path = checkpoint_dir / "best_checkpoint.pt"
+                checkpoint_dir.mkdir(parents=True, exist_ok=True)
+                torch.save({
+                    'step': step,
+                    'model_state_dict': model.state_dict(),
+                    'optimizer_state_dict': optimizer.state_dict(),
+                    'scheduler_state_dict': scheduler.state_dict(),
+                    'config': config,
+                    'best_metric': best_metric,
+                    'rng_state': torch.get_rng_state(),
+                    'model_type': 'FATransformerResidual',
+                }, best_checkpoint_path)
+
+                # Also save just the model weights for easy inference
+                best_weights_path = checkpoint_dir / "best_model.pt"
+                torch.save(model.state_dict(), best_weights_path)
+
+                print(f"Step {step}: New best validation Nash welfare: {best_metric:.6f} (residual_scale: {model.residual_scale.item():.4f})")
+                if use_wandb:
+                    wandb.save(str(best_checkpoint_path))
+                    wandb.save(str(best_weights_path))
+            else:
+                steps_without_improvement += 1
+
+        # Log to console every 100 steps
+        if step % 100 == 0:
+            print(f"Step {step}/{config['steps']}: loss={loss.item():.6f}, "
+                  f"nw={nash_welfare.item():.6f}, residual_scale={model.residual_scale.item():.4f}, "
+                  f"lr={scheduler.get_last_lr()[0]:.2e}")
+
+        if use_wandb:
+            wandb.log(metrics, step=step)
+
+        # Checkpoint
+        if step % config['checkpoint_every'] == 0 and step > 0:
+            save_checkpoint(
+                checkpoint_dir, step, model, optimizer, scheduler,
+                config, best_metric, config['keep_checkpoints']
+            )
+
+        # Early stopping
+        if steps_without_improvement >= config['patience']:
+            print(f"Early stopping at step {step} (no improvement for {config['patience']} validation checks)")
+            if use_wandb:
+                wandb.log({
+                    "early_stop_step": step,
+                    "best_val_nash_welfare": best_metric,
+                    "final_residual_scale": model.residual_scale.item(),
+                }, step=step)
+            break
+
+    # Final checkpoint
+    print("Training complete. Saving final checkpoint...")
+    save_checkpoint(
+        checkpoint_dir, step, model, optimizer, scheduler,
+        config, best_metric, config['keep_checkpoints']
+    )
+
+    print(f"\nBest validation Nash welfare: {best_metric:.6f}")
+    print(f"Final residual scale: {model.residual_scale.item():.4f}")
+    print(f"Best checkpoint (for resuming): {checkpoint_dir / 'best_checkpoint.pt'}")
+    print(f"Best model weights (for inference): {checkpoint_dir / 'best_model.pt'}")
+
+    if use_wandb:
+        wandb.finish()
+
+
+def main():
+    args = parse_args()
+
+    # Build config
+    config = vars(args)
+
+    # Load from file if specified - file config overrides argparse defaults
+    if args.config:
+        file_config = load_config(args.config)
+        for key, value in file_config.items():
+            key_normalized = key.replace('-', '_')
+            config[key_normalized] = value
+
+    train(config)
+
+
+if __name__ == "__main__":
+    main()
