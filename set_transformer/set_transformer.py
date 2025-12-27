@@ -1,6 +1,6 @@
 import torch.nn as nn
 import torch
-from fatransformer.model_components import GLU, MHA
+from fftransformer.model_components import GLU, MHA
 from typing import Optional
 
 class MAB(nn.Module):

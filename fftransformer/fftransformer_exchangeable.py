@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from .model_components import GLU, MHA
 from .exchangeable_layer import ExchangeableLayer
-from .attention_blocks import FASelfAttentionBlock, FACrossAttentionBlock
+from .attention_blocks import FFSelfAttentionBlock, FFCrossAttentionBlock
 
 
 class BilinearLayer(nn.Module):
@@ -33,7 +33,7 @@ class BilinearLayer(nn.Module):
         return torch.matmul(x_item, x_agent.transpose(1, 2))
 
 
-class FATransformer(nn.Module):
+class FFTransformerExchangeable(nn.Module):
     def __init__(self, n, m, d_model: int, num_heads: int, num_output_layers: int = 1, dropout: float = 0.0, initial_temperature: float = 1.0, final_temperature: float = 0.01):
         super().__init__()
 
@@ -49,13 +49,13 @@ class FATransformer(nn.Module):
         
         self.agent_proj = ExchangeableLayer(1, d_model, pool_config={'row': ['mean', 'max', 'min'], 'column': [], 'global': []})
         self.item_proj = ExchangeableLayer(1, d_model, pool_config={'row': ['mean', 'max', 'min'], 'column': [], 'global': []})
-        self.output_proj = BilinearLayer(d_model, d_model, bias=True)
+        self.output_proj = BilinearLayer()
 
-        self.agent_transformer = FASelfAttentionBlock(d_model, num_heads, dropout)
-        self.item_transformer = FASelfAttentionBlock(d_model, num_heads, dropout)
-        self.item_agent_transformer = FACrossAttentionBlock(d_model, num_heads, dropout)
+        self.agent_transformer = FFSelfAttentionBlock(d_model, num_heads, dropout)
+        self.item_transformer = FFSelfAttentionBlock(d_model, num_heads, dropout)
+        self.item_agent_transformer = FFCrossAttentionBlock(d_model, num_heads, dropout)
         self.output_transformer = nn.ModuleList(
-            [FASelfAttentionBlock(d_model, num_heads, dropout) for _ in range(num_output_layers)]
+            [FFSelfAttentionBlock(d_model, num_heads, dropout) for _ in range(num_output_layers)]
         )
 
         self.o_norm = nn.RMSNorm(d_model)
@@ -73,12 +73,13 @@ class FATransformer(nn.Module):
     def forward(self, x: torch.Tensor):
         B, n, m = x.shape
 
-        x_agent = self.agent_proj(x_agent)  # (B, n, m) -> (B, n, m, d_model)
-        x_agent = x_agent.mean(dim=2) #  (B, n, m, d_model) -> (B, n, d_model)
+        # ExchangeableLayer outputs (B, d_model, H, W)
+        x_agent = self.agent_proj(x)  # (B, n, m) -> (B, d_model, n, m)
+        x_agent = x_agent.mean(dim=3).permute(0, 2, 1)  # (B, d_model, n, m) -> (B, n, d_model)
 
         x_item = x.permute(0, 2, 1)  # (B, m, n)
-        x_item = self.item_proj(x_item)  # (B, m, n) -> (B, m, n, d_model)
-        x_item = x_item.mean(dim=2)  # (B, m, n, d_model) -> (B, m, d_model)
+        x_item = self.item_proj(x_item)  # (B, m, n) -> (B, d_model, m, n)
+        x_item = x_item.mean(dim=3).permute(0, 2, 1)  # (B, d_model, m, n) -> (B, m, d_model)
 
         # Apply transformers
         x_agent = self.agent_transformer(x_agent)  # (B, n, d_model)

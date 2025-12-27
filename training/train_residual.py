@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 """
-Production training script for FFTransformer.
+Production training script for FFTransformerResidual.
 
-Use after identifying best hyperparameters from bayesian_sweep.py.
+Use after identifying best hyperparameters from bayesian_sweep_residual.py.
 Supports longer training runs, checkpointing, and resuming.
 """
 
@@ -29,7 +29,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from fftransformer.fftransformer import FFTransformer  # noqa: E402
+from fftransformer.fftransformer_residual import FFTransformerResidual  # noqa: E402
 from fftransformer.helpers import get_nash_welfare  # noqa: E402
 
 try:
@@ -39,10 +39,20 @@ except ImportError:
     HAS_WANDB = False
 
 
+# Pool config options (same as in bayesian_sweep_residual.py)
+POOL_CONFIGS = {
+    "row_only": {'row': ['mean', 'max', 'min'], 'column': [], 'global': []},
+    "row_col": {'row': ['mean', 'max', 'min'], 'column': ['mean', 'max', 'min'], 'global': []},
+    "row_global": {'row': ['mean', 'max', 'min'], 'column': [], 'global': ['mean', 'max', 'min']},
+    "all": {'row': ['mean', 'max', 'min'], 'column': ['mean', 'max', 'min'], 'global': ['mean', 'max', 'min']},
+    "row_col_mean": {'row': 'mean', 'column': 'mean', 'global': []},
+}
+
+
 def parse_args():
     """Parse command-line arguments."""
     parser = argparse.ArgumentParser(
-        description="Production training for FFTransformer"
+        description="Production training for FFTransformerResidual"
     )
 
     # Config options
@@ -52,10 +62,18 @@ def parse_args():
     # Model hyperparameters (can override config)
     parser.add_argument("--n", type=int, default=10, help="Number of agents")
     parser.add_argument("--m", type=int, default=20, help="Number of items")
-    parser.add_argument("--d-model", type=int, default=768, help="Model dimension")
-    parser.add_argument("--num-heads", type=int, default=12, help="Number of attention heads")
-    parser.add_argument("--num-output-layers", type=int, default=4, help="Number of output layers")
+    parser.add_argument("--d-model", type=int, default=256, help="Model dimension")
+    parser.add_argument("--num-heads", type=int, default=8, help="Number of attention heads")
+    parser.add_argument("--num-output-layers", type=int, default=2, help="Number of output layers")
+    parser.add_argument("--num-encoder-layers", type=int, default=1, help="Number of encoder layers")
     parser.add_argument("--dropout", type=float, default=0.0, help="Dropout rate")
+
+    # Residual-specific parameters
+    parser.add_argument("--pool-config-name", type=str, default="row_col",
+                       choices=list(POOL_CONFIGS.keys()),
+                       help="Pool configuration name")
+    parser.add_argument("--residual-scale-init", type=float, default=0.1,
+                       help="Initial residual scale value")
 
     # Training hyperparameters
     parser.add_argument("--lr", type=float, default=1e-4, help="Learning rate")
@@ -72,7 +90,7 @@ def parse_args():
     parser.add_argument("--seed", type=int, default=0, help="Random seed")
 
     # Checkpointing
-    parser.add_argument("--checkpoint-dir", type=str, default="checkpoints",
+    parser.add_argument("--checkpoint-dir", type=str, default="checkpoints/residual",
                        help="Directory to save checkpoints")
     parser.add_argument("--checkpoint-every", type=int, default=5000,
                        help="Save checkpoint every N steps")
@@ -92,7 +110,7 @@ def parse_args():
                        help="Minimum improvement for early stopping")
 
     # Wandb
-    parser.add_argument("--wandb-project", type=str, default="fa-transformer-production")
+    parser.add_argument("--wandb-project", type=str, default="fa-transformer-residual-production")
     parser.add_argument("--wandb-entity", type=str, default=None)
     parser.add_argument("--run-name", type=str, default=None, help="Wandb run name")
     parser.add_argument("--no-wandb", action="store_true", help="Disable wandb logging")
@@ -134,6 +152,7 @@ def save_checkpoint(
         'config': config,
         'best_metric': best_metric,
         'rng_state': torch.get_rng_state(),
+        'model_type': 'FFTransformerResidual',
     }, checkpoint_path)
 
     # Clean up old checkpoints
@@ -188,6 +207,36 @@ def validate(model, n, m, val_size, device, temperature=None):
     return val_nash_welfare.item()
 
 
+def create_model(config: Dict[str, Any], device: torch.device):
+    """Create FFTransformerResidual model from config."""
+    # Get pool config
+    pool_config_name = config.get('pool_config_name', 'row_col')
+    pool_config = POOL_CONFIGS.get(pool_config_name, POOL_CONFIGS['row_col'])
+
+    # Note: The production FFTransformerResidual class uses a fixed pool_config
+    # from the fftransformer_residual.py file. For the sweep version, we would
+    # need to modify the class to accept pool_config as a parameter.
+    # Here we use the standard FFTransformerResidual which has a fixed pool_config.
+    model = FFTransformerResidual(
+        n=config['n'],
+        m=config['m'],
+        d_model=config['d_model'],
+        num_heads=config['num_heads'],
+        num_output_layers=config['num_output_layers'],
+        num_encoder_layers=config.get('num_encoder_layers', 1),
+        dropout=config['dropout'],
+        initial_temperature=config['initial_temperature'],
+        final_temperature=config['final_temperature'],
+    ).to(device)
+
+    # Override residual scale init if specified
+    residual_scale_init = config.get('residual_scale_init', 0.1)
+    with torch.no_grad():
+        model.residual_scale.fill_(residual_scale_init)
+
+    return model
+
+
 def train(config: Dict[str, Any]):
     """Main training loop."""
 
@@ -212,18 +261,10 @@ def train(config: Dict[str, Any]):
         print("Warning: wandb not installed. Install with: pip install wandb")
 
     # Create model
-    model = FFTransformer(
-        n=config['n'],
-        m=config['m'],
-        d_model=config['d_model'],
-        num_heads=config['num_heads'],
-        num_output_layers=config['num_output_layers'],
-        dropout=config['dropout'],
-        initial_temperature=config['initial_temperature'],
-        final_temperature=config['final_temperature'],
-    ).to(device)
+    model = create_model(config, device)
 
     print(f"Model created: {sum(p.numel() for p in model.parameters())} parameters")
+    print(f"Residual scale init: {model.residual_scale.item():.4f}")
 
     # Optimizer and scheduler
     optimizer = optim.AdamW(
@@ -293,6 +334,7 @@ def train(config: Dict[str, Any]):
             "nash_welfare": nash_welfare.item(),
             "lr": scheduler.get_last_lr()[0],
             "temperature": current_temp.item(),
+            "residual_scale": model.residual_scale.item(),
         }
 
         # Validation
@@ -319,13 +361,14 @@ def train(config: Dict[str, Any]):
                     'config': config,
                     'best_metric': best_metric,
                     'rng_state': torch.get_rng_state(),
+                    'model_type': 'FFTransformerResidual',
                 }, best_checkpoint_path)
 
                 # Also save just the model weights for easy inference
                 best_weights_path = checkpoint_dir / "best_model.pt"
                 torch.save(model.state_dict(), best_weights_path)
 
-                print(f"Step {step}: New best validation Nash welfare: {best_metric:.6f}")
+                print(f"Step {step}: New best validation Nash welfare: {best_metric:.6f} (residual_scale: {model.residual_scale.item():.4f})")
                 if use_wandb:
                     wandb.save(str(best_checkpoint_path))
                     wandb.save(str(best_weights_path))
@@ -335,7 +378,8 @@ def train(config: Dict[str, Any]):
         # Log to console every 100 steps
         if step % 100 == 0:
             print(f"Step {step}/{config['steps']}: loss={loss.item():.6f}, "
-                  f"nw={nash_welfare.item():.6f}, lr={scheduler.get_last_lr()[0]:.2e}")
+                  f"nw={nash_welfare.item():.6f}, residual_scale={model.residual_scale.item():.4f}, "
+                  f"lr={scheduler.get_last_lr()[0]:.2e}")
 
         if use_wandb:
             wandb.log(metrics, step=step)
@@ -354,6 +398,7 @@ def train(config: Dict[str, Any]):
                 wandb.log({
                     "early_stop_step": step,
                     "best_val_nash_welfare": best_metric,
+                    "final_residual_scale": model.residual_scale.item(),
                 }, step=step)
             break
 
@@ -365,6 +410,7 @@ def train(config: Dict[str, Any]):
     )
 
     print(f"\nBest validation Nash welfare: {best_metric:.6f}")
+    print(f"Final residual scale: {model.residual_scale.item():.4f}")
     print(f"Best checkpoint (for resuming): {checkpoint_dir / 'best_checkpoint.pt'}")
     print(f"Best model weights (for inference): {checkpoint_dir / 'best_model.pt'}")
 
@@ -378,14 +424,12 @@ def main():
     # Build config
     config = vars(args)
 
-    # Load from file if specified
+    # Load from file if specified - file config overrides argparse defaults
     if args.config:
         file_config = load_config(args.config)
-        # CLI args override file config
         for key, value in file_config.items():
             key_normalized = key.replace('-', '_')
-            if key_normalized not in config or config[key_normalized] is None:
-                config[key_normalized] = value
+            config[key_normalized] = value
 
     train(config)
 

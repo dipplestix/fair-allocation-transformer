@@ -1,7 +1,7 @@
 """Set Transformer implementation
 
 Alternative architecture using induced set attention for fair allocation.
-This is an experimental baseline for comparison with FATransformer.
+This is an experimental baseline for comparison with FFTransformer.
 """
 
 from .set_transformer import MAB, SAB, ISAB, PMA

@@ -1,0 +1,32 @@
+# Configuration for FFTransformerResidual trained on n=30, m=60
+# Based on best sweep config, adapted for larger problem size
+#
+# To train:
+#   uv run python training/train_residual.py --config configs/residual_30_60.yaml
+
+n: 30
+m: 60
+d_model: 128
+num_heads: 8
+num_output_layers: 2
+num_encoder_layers: 3
+dropout: 0.09918628095456948
+pool_config_name: row_col
+residual_scale_init: 0.34560344700183276
+lr: 0.0028933400665682968
+weight_decay: 0.003062230822706729
+batch_size: 64  # Reduced from 256 due to larger input size (30x60 vs 10x20)
+steps: 100000
+initial_temperature: 0.9325787187470638
+final_temperature: 0.09837512050934188
+grad_clip_norm: 1
+seed: 42
+checkpoint_dir: checkpoints/residual_30_60
+checkpoint_every: 5000
+keep_checkpoints: 3
+val_every: 1000
+val_size: 1000
+patience: 30
+min_delta: 1.0e-05
+wandb_project: fa-transformer-residual-30-60
+run_name: residual_30_60_production

@@ -1,7 +1,7 @@
 """Benchmark ExchangeableLayer projection implementations.
 
 This script compares the projection implemented with ``nn.Linear`` in
-:class:`fatransformer.exchangeable_layer.ExchangeableLayer` against an
+:class:`fftransformer.exchangeable_layer.ExchangeableLayer` against an
 alternative 1x1 convolution based projection.  Both versions share the
 same pooling front-end so the benchmark isolates the cost of the
 projection step.
@@ -38,7 +38,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from fatransformer.exchangeable_layer import ExchangeableLayer, PoolLayer
+from fftransformer.exchangeable_layer import ExchangeableLayer, PoolLayer
 
 
 @dataclass(frozen=True)

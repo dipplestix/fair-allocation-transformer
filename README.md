@@ -44,10 +44,10 @@ uv sync
 # Run a simple example
 uv run python -c "
 import torch
-from fatransformer import FATransformer, get_nash_welfare
+from fftransformer import FFTransformerResidual, get_nash_welfare
 
 # Create model for 10 agents, 20 items
-model = FATransformer(n=10, m=20, d_model=256, num_heads=8, num_output_layers=2)
+model = FFTransformerResidual(n=10, m=20, d_model=256, num_heads=8, num_output_layers=2)
 
 # Generate random valuations and compute allocation
 valuations = torch.rand(4, 10, 20)  # batch of 4
@@ -87,42 +87,107 @@ FairFormer learns to produce high-welfare allocations efficiently through:
 
 ## Architecture
 
-### Two-Tower Design
+### FFTransformerResidual (Recommended)
 
-FairFormer uses a symmetric two-tower architecture that respects the problem's symmetries:
+The recommended architecture uses a two-tower design with exchangeable layers and a learnable residual connection:
 
 ```
-Valuation Matrix (n × m)
-         ↓
-    ┌────┴────┐
-    ↓         ↓
-Agent Tower  Item Tower
-(n × d)      (m × d)
-    ↓         ↓
-Self-Attn   Self-Attn
-    ↓         ↓
-    └────┬────┘
-         ↓
-   Cross Attention
-         ↓
-   Output Layers
-         ↓
-Softmax (temperature)
-         ↓
-  Allocation (m × n)
+                        ┌─────────────────────────────────────────────────────────┐
+                        │              INPUT: Valuations (B, n, m)                │
+                        │         n = agents, m = items, B = batch                │
+                        └───────────────────────────┬─────────────────────────────┘
+                                                    │
+                        ┌───────────────────────────┼───────────────────────────┐
+                        │                           │                           │
+                        ▼                           │                           ▼
+         ┌──────────────────────────┐               │          ┌──────────────────────────┐
+         │   ExchangeableLayer      │               │          │   ExchangeableLayer      │
+         │      (agent_proj)        │               │          │      (item_proj)         │
+         │  1 → d_model channels    │               │          │  1 → d_model channels    │
+         │  + row/col pooling stats │               │          │  + row/col pooling stats │
+         └───────────┬──────────────┘               │          └───────────┬──────────────┘
+                     │                              │                      │
+                     ▼                              │                      ▼
+         ┌──────────────────────────┐               │          ┌──────────────────────────┐
+         │     Mean over items      │               │          │     Mean over agents     │
+         │    (B, n, d_model)       │               │          │    (B, m, d_model)       │
+         └───────────┬──────────────┘               │          └───────────┬──────────────┘
+                     │                              │                      │
+                     ▼                              │                      ▼
+         ┌──────────────────────────┐               │          ┌──────────────────────────┐
+         │   Self-Attention (×L)    │               │          │   Self-Attention (×L)    │
+         │   agent_transformer      │               │          │   item_transformer       │
+         │   L = num_encoder_layers │               │          │   L = num_encoder_layers │
+         └───────────┬──────────────┘               │          └───────────┬──────────────┘
+                     │                              │                      │
+                     │         x_agent              │                      │  x_item
+                     │       (B, n, d)              │                      │ (B, m, d)
+                     │                              │                      │
+                     ├──────────────────────────────┼─────────────────────►│
+                     │                              │                      ▼
+                     │                              │          ┌──────────────────────────┐
+                     │                              │          │    Cross-Attention       │
+                     │                              │          │  items attend to agents  │
+                     │                              │          │ item_agent_transformer   │
+                     │                              │          └───────────┬──────────────┘
+                     │                              │                      │
+                     │                              │                      ▼
+                     │                              │          ┌──────────────────────────┐
+                     │                              │          │   Self-Attention (×K)    │
+                     │                              │          │   output_transformer     │
+                     │                              │          │   K = num_output_layers  │
+                     │                              │          └───────────┬──────────────┘
+                     │                              │                      │
+                     │                              │                      ▼
+                     │                              │          ┌──────────────────────────┐
+                     │                              │          │       RMSNorm            │
+                     │                              │          │      x_output            │
+                     │                              │          │    (B, m, d_model)       │
+                     │                              │          └───────────┬──────────────┘
+                     │                              │                      │
+                     │                              │                      │
+                     ▼                              │                      ▼
+         ┌───────────────────────────────────────────────────────────────────┐
+         │                      Bilinear Product                             │
+         │                   x_output @ x_agent.T                            │
+         │                        (B, m, n)                                  │
+         └───────────────────────────────┬───────────────────────────────────┘
+                                         │
+                                         │
+                                         ▼                      ▼ (from input)
+         ┌───────────────────────────────────────────────────────────────────┐
+         │                           ADD                                     │
+         │   bilinear_out + residual_scale × input.permute(0,2,1)           │
+         │                     (learnable scalar)                            │
+         └───────────────────────────────┬───────────────────────────────────┘
+                                         │
+                                         ▼
+                        ┌────────────────────────────────────┐
+                        │   Softmax(x / temperature, dim=-1) │
+                        │   (normalize over agents)          │
+                        └────────────────┬───────────────────┘
+                                         │
+                                         ▼
+                        ┌────────────────────────────────────┐
+                        │    OUTPUT: Allocation (B, m, n)    │
+                        │   Each item's fractional alloc     │
+                        │   to each agent (sums to 1)        │
+                        └────────────────────────────────────┘
 ```
 
 **Key design principles**:
 
-1. **Agent Tower**: Projects each agent's valuation vector → embedding, applies self-attention
-2. **Item Tower**: Projects each item's valuation vector (across agents) → embedding, applies self-attention
-3. **Cross Attention**: Items attend to agents to compute allocation scores
-4. **Temperature Annealing**: Starts with smooth softmax (exploration), anneals to near-discrete (exploitation)
+1. **Dual-stream encoding**: Agents and items are encoded separately with exchangeable layers that respect permutation equivariance
+2. **Exchangeable pooling**: Each stream aggregates row/column statistics (mean, max, min) to capture global context while maintaining exchangeability
+3. **Cross-attention fusion**: Items attend to agent representations to learn item-agent compatibility
+4. **Bilinear output**: The final allocation scores come from `x_output @ x_agent.T`, creating an (m × n) compatibility matrix
+5. **Residual connection**: Raw input valuations are added (scaled by learnable `residual_scale`) before softmax - this significantly boosts performance by giving the model direct access to the input signal
+6. **Temperature-scaled softmax**: Annealed during training (high→low) to transition from soft to hard allocations
 
 ### Attention Blocks
 
-- **FASelfAttentionBlock**: RMSNorm → Multi-Head Attention → GLU (Gated Linear Unit)
-- **FACrossAttentionBlock**: Separate normalization for queries and keys/values
+- **FFSelfAttentionBlock**: RMSNorm → Multi-Head Attention → GLU (Gated Linear Unit)
+- **FFCrossAttentionBlock**: Separate normalization for queries and keys/values
 - **GLU**: SiLU-gated feedforward (8/3 expansion ratio)
 
 ### Temperature Annealing
@@ -143,7 +208,7 @@ This balances exploration (learning) with exploitation (discrete allocations).
 - PyTorch 2.1+
 - CUDA 12.x (optional, for GPU acceleration)
 
-### Method 1: uv (recommended)
+### Install
 
 ```bash
 # Install uv if not already installed
@@ -151,12 +216,6 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # Install project dependencies
 uv sync
-```
-
-### Method 2: pip install (alternative)
-
-```bash
-pip install -e .
 ```
 
 ### Dependencies
@@ -172,34 +231,52 @@ Core dependencies (from `pyproject.toml`):
 ### Verify Installation
 
 ```bash
-uv run python -c "from fatransformer import FATransformer; print('✓ Installation successful')"
+uv run python -c "from fftransformer import FFTransformerResidual; print('✓ Installation successful')"
 ```
 
 ---
 
 ## Model Variants
 
-FairFormer includes two variants - use the **standard** version for most applications.
+FairFormer includes three variants - use **FFTransformerResidual** for best performance.
 
-### Standard FATransformer (Recommended)
+### FFTransformerResidual (Recommended)
 
-**File**: `fatransformer/fatransformer.py`
+**File**: `fftransformer/fftransformer_residual.py`
 
 **When to use**: Default choice for all fair division problems
 
 **Features**:
-- Linear projections for agent/item embeddings
-- Proven performance on benchmarks
-- Simpler, faster, more stable
+- ExchangeableLayer projections with pooling statistics
+- Bilinear output layer (dot product of item & agent embeddings)
+- Learnable residual connection from input valuations
+- Configurable encoder depth (`num_encoder_layers`)
+- Size-agnostic: works on any (n, m) at inference time
 
 **Import**:
 ```python
-from fatransformer import FATransformer
+from fftransformer import FFTransformerResidual
 ```
 
-### Exchangeable FATransformer (Experimental)
+### FFTransformer (Linear Baseline)
 
-**File**: `fatransformer/fatransformer_exchangeable.py`
+**File**: `fftransformer/fftransformer.py`
+
+**When to use**: Fixed-size problems, comparison baseline
+
+**Features**:
+- Linear projections for agent/item embeddings
+- Simpler architecture, faster training
+- First approach that demonstrated size-agnostic input/output handling
+
+**Import**:
+```python
+from fftransformer import FFTransformer
+```
+
+### FFTransformerExchangeable (Experimental)
+
+**File**: `fftransformer/fftransformer_exchangeable.py`
 
 **When to use**: Research on permutation equivariance, experimental only
 
@@ -210,21 +287,19 @@ from fatransformer import FATransformer
 
 **Import**:
 ```python
-from fatransformer import FATransformerExchangeable
+from fftransformer import FFTransformerExchangeable
 ```
-
-**Note**: The exchangeable variant is currently experimental. The standard FATransformer typically achieves better performance and training stability.
 
 ### Comparison Table
 
-| Feature | Standard | Exchangeable |
-|---------|----------|--------------|
-| Projection layers | Linear | ExchangeableLayer |
-| Output layer | Linear | Bilinear |
-| Performance | ✓ Proven | Experimental |
-| Training stability | ✓ High | Variable |
-| Equivariance guarantees | Empirical | Theoretical |
-| Recommended use | Production | Research |
+| Feature | Residual (Recommended) | Linear | Exchangeable |
+|---------|------------------------|--------|--------------|
+| Projection layers | ExchangeableLayer | Linear | ExchangeableLayer |
+| Output layer | Bilinear + Residual | Linear | Bilinear |
+| Residual connection | ✓ Yes | No | No |
+| Performance | ✓ Best | Good | Experimental |
+| Size-agnostic | ✓ Yes | Limited | ✓ Yes |
+| Recommended use | Production | Baseline | Research |
 
 ---
 
@@ -235,14 +310,12 @@ from fatransformer import FATransformerExchangeable
 The recommended way to train FairFormer is using Bayesian optimization via W&B:
 
 ```bash
-# 1. Create sweep
-python training/bayesian_sweep.py --create --project my-fa-project
+# 1. Create sweep and launch agent
+uv run python training/bayesian_sweep_residual.py --run-agent --count 50
 
-# 2. Launch agent (copy sweep ID from step 1)
+# Or create sweep first, then run agent separately
+uv run python training/bayesian_sweep_residual.py --create
 wandb agent <entity/project>/<sweep_id>
-
-# Or combine both steps
-python training/bayesian_sweep.py --run-agent --project my-fa-project
 ```
 
 ### Extracting Best Configuration
@@ -251,39 +324,42 @@ After your sweep completes, export the best configuration:
 
 ```bash
 # Export best config from sweep
-python tools/export_best_sweep.py <sweep_id> --project fa-transformer-sweep
+uv run python tools/export_best_sweep_residual.py <sweep_id> --project fa-transformer-residual-sweep
 
 # Example
-python tools/export_best_sweep.py abc123xyz --project fa-transformer-sweep --entity my-team
+uv run python tools/export_best_sweep_residual.py abc123xyz --project fa-transformer-residual-sweep --entity my-team
 ```
 
-This creates `configs/best_from_sweep.yaml` with:
+This creates `configs/best_from_sweep_residual.yaml` with:
 - All hyperparameters from the best run
 - Increased steps to 100k for production
-- Ready to use with `train.py`
+- Ready to use with `train_residual.py`
 
 ### Sweep Configuration
 
-The sweep (defined in `bayesian_sweep.py`) optimizes:
+The sweep (defined in `bayesian_sweep_residual.py`) optimizes:
 
 **Architecture**:
-- `d_model`: 768 (fixed for this sweep)
-- `num_heads`: [4, 8, 12, 16]
-- `num_output_layers`: [1, 2, 3, 4, 5]
-- `dropout`: [0.0, 0.01]
+- `d_model`: [128, 256, 512, 768]
+- `num_heads`: [4, 8, 16]
+- `num_output_layers`: [1, 2, 3, 4]
+- `num_encoder_layers`: [1, 2, 3]
+- `dropout`: [0.0, 0.1]
+- `pool_config_name`: ["row_only", "row_col", "row_global", "all"]
+- `residual_scale_init`: log-uniform [0.01, 1.0]
 
 **Training**:
-- `lr`: log-uniform [3e-5, 3e-4]
+- `lr`: log-uniform [1e-4, 3e-3]
 - `weight_decay`: log-uniform [1e-5, 5e-2]
-- `batch_size`: [512, 1024, 2048]
-- `steps`: 20000
+- `batch_size`: [256, 512, 1024]
+- `steps`: 10000
 
 **Temperature**:
 - `initial_temperature`: [0.5, 2.0]
-- `final_temperature`: log-uniform [0.001, 0.01]
+- `final_temperature`: log-uniform [0.001, 0.1]
 
 **Early stopping**:
-- `patience`: 20 steps
+- `patience`: 30 steps
 - `min_delta`: 1e-5
 
 ### Training Loop
@@ -294,32 +370,25 @@ Each run:
 3. Calculates Nash welfare (optimization objective)
 4. Backpropagates `-nash_welfare` (maximize welfare = minimize negative welfare)
 5. Clips gradients (norm=1.0)
-6. Logs to W&B: loss, Nash welfare, learning rate
-
-### Monitoring Training
-
-W&B dashboard shows:
-- Nash welfare over time (primary metric)
-- Learning rate schedule (cosine annealing)
-- Early stopping triggers
+6. Logs to W&B: loss, Nash welfare, learning rate, residual_scale
 
 ### Production Training
 
-After identifying best hyperparameters from the sweep, run production training with the dedicated training script:
+After identifying best hyperparameters from the sweep, run production training:
 
 ```bash
 # Option 1: Use config file
-python training/train.py --config configs/best_config.yaml
+uv run python training/train_residual.py --config configs/best_from_sweep_residual.yaml
 
 # Option 2: Specify parameters via CLI
-python training/train.py \
+uv run python training/train_residual.py \
     --n 10 --m 20 \
-    --d-model 768 --num-heads 12 --num-output-layers 4 \
+    --d-model 256 --num-heads 8 --num-output-layers 2 \
     --lr 0.0001 --weight-decay 0.01 \
     --steps 100000
 
 # Resume from checkpoint
-python training/train.py --resume checkpoints/checkpoint_50000.pt
+uv run python training/train_residual.py --resume checkpoints/residual/checkpoint_50000.pt
 ```
 
 **Key Features**:
@@ -329,14 +398,7 @@ python training/train.py --resume checkpoints/checkpoint_50000.pt
 - Configurable early stopping
 - Full wandb integration
 
-**Config File Example** (`configs/example_config.yaml`):
-See `configs/example_config.yaml` for a complete configuration template with all parameters documented.
-
-Checkpoints are saved to `checkpoints/` directory by default. The best model is saved as `checkpoints/best_model.pt`.
-
-### Manual Training
-
-For custom training loops, see `training/train.py` or `training/bayesian_sweep.py` as templates. For interactive experimentation, see notebooks in `notebooks/training/`.
+Checkpoints are saved to `checkpoints/residual/` directory by default. The best model is saved as `checkpoints/residual/best_model.pt`.
 
 ---
 
@@ -357,7 +419,7 @@ Create valuation matrices with precomputed optimal welfare:
 
 ```bash
 cd eval_pipeline
-python generate_dataset.py --agents 10 --items 14 --num_matrices 100000
+uv run python generate_dataset.py --agents 10 --items 14 --num_matrices 100000
 ```
 
 **Output**: `10_14_100000_dataset.npz` containing:
@@ -371,310 +433,47 @@ python generate_dataset.py --agents 10 --items 14 --num_matrices 100000
 Run model inference and compute fairness metrics:
 
 ```bash
-python evaluation.py 10_14_100000_dataset.npz \
+uv run python evaluation.py 10_14_100000_dataset.npz \
   --eval_type model \
-  --model_config my_model_config.json \
+  --model_config best_model_config.json \
   --batch_size 100
 ```
-
-**Model config** (`my_model_config.json`):
-```json
-{
-  "model_name": "fatransformer_v1",
-  "model_weight_path": "../models/fatransformer_10_14.pt",
-  "model_def_path": "../fatransformer/fatransformer.py",
-  "model_class_def": "FATransformer",
-  "n": 10,
-  "m": 14,
-  "d_model": 768,
-  "num_heads": 12,
-  "num_output_layers": 4,
-  "initial_temperature": 1.0,
-  "final_temperature": 0.01
-}
-```
-
-**Output**: CSV with columns:
-- `matrix_id`, `num_agents`, `num_items`
-- `envy_free`, `ef1`, `efx` (boolean fairness properties)
-- `utility_sum`, `nash_welfare` (allocation quality)
-- `fraction_util_welfare`, `fraction_nash_welfare` (efficiency ratios vs optimal)
-- `inference_time`
-
-### Step 3: Summarize Results
-
-Aggregate statistics across evaluation runs:
-
-```bash
-python summarize_results.py --folder results/ --inference_types model random
-```
-
-**Output**: Summary statistics (mean, std, median) for:
-- Fairness property rates (% EF, EF1, EFx)
-- Welfare metrics
-- Efficiency fractions
 
 ### Baselines
 
 Compare against:
 - `--eval_type random`: Random allocations
-- `--eval_type rr`: Round-robin allocations
+- `--eval_type rr`: Round-robin allocations (greedy, EF1 guaranteed)
+- MaxUtil: Each item to highest-valuing agent
+- MaxNash: Gurobi LP for optimal Nash welfare
+- ECE: Envy Cycle Elimination
 
-### Auto-Run Multiple Evaluations
+### EF1 Repair Post-Processing
 
-```bash
-python auto_run_evals.py datasets/ \
-  --num_agents_list 10 \
-  --num_items_list 10 14 20 \
-  --num_matrices_list 10000 \
-  --eval_type model \
-  --model_config config.json
-```
-
-### Batch Evaluation Scripts
-
-For comprehensive model evaluation across multiple dataset sizes and baselines, use the shell scripts:
-
-#### 1. Evaluate Model Across All Datasets
-
-```bash
-cd eval_pipeline
-./run_all_evaluations.sh
-```
-
-**What it does**:
-- Evaluates your trained model on datasets from `10_10` to `10_20` (10 agents, 10-20 items)
-- Uses `best_model_config.json` for model configuration
-- Batch size: 100 instances per batch
-- Saves results to `results/evaluation_results_10_{m}_100000_best_from_sweep_*.csv`
-
-**Customize**:
-- Edit the script to change dataset range (default: `m in {10..20}`)
-- Modify `--batch_size` for different processing batches
-- Update model config path if using different configuration
-
-#### 2. Evaluate Random Baseline
-
-```bash
-./run_random_baseline.sh
-```
-
-**What it does**:
-- Generates 5 random allocations per instance
-- Averages fairness and welfare metrics
-- Runs on same datasets (10-20 items)
-- Saves to `results/evaluation_results_10_{m}_100000_random.csv`
-
-#### 3. Evaluate Round-Robin Baseline
-
-```bash
-./run_rr_baseline.sh
-```
-
-**What it does**:
-- Implements greedy round-robin allocation (agents pick in order)
-- Each agent selects their most preferred available item
-- Guaranteed to satisfy EF1 property
-- Saves to `results/evaluation_results_10_{m}_100000_rr.csv`
-
-#### 4. Generate Comparison Summary
-
-After running evaluations, create comparison tables:
-
-```bash
-cd eval_pipeline
-uv run compare_results.py
-```
-
-**Output**:
-- Prints detailed comparison tables to console
-- Shows EF, EF1, EFx, Utility, and Nash Welfare percentages
-- Breaks down by dataset size (m=10 to m=20)
-- Saves summary to `results/comparison_summary.csv`
-
-**Example output**:
-```
-Dataset: 10_20 (n=10, m=20)
-Method             EF      EF1      EFx    Utility   Nash Welfare
-----------------------------------------------------------------
-Model            8.3%    70.8%    31.8%      97.9%          97.6%
-Random           0.0%     0.0%     0.0%      55.0%           9.2%
-RR               6.1%   100.0%    94.6%      92.8%          94.4%
-```
-
-#### 5. Create Performance Visualizations
-
-Generate plots comparing metrics across dataset sizes:
-
-```bash
-uv run analyze_and_plot.py
-```
-
-**Output**:
-- `results/comparison_plots.png`: 6-panel plot showing all metrics vs. number of items
-  - Envy-Free (EF) %
-  - EF1 %
-  - EFx %
-  - Utility Fraction %
-  - Nash Welfare Fraction %
-  - Average Runtime (ms)
-- `results/runtime_comparison.png`: Detailed runtime analysis
-
-**What the plots show**:
-- How each method performs as problem size increases (m=10 to m=20)
-- Model generalization from training distribution (m=20)
-- Speed vs. performance tradeoffs
-
-#### 6. Evaluate Envy Cycle Elimination (ECE) Baseline
-
-```bash
-./run_ece_baseline.sh
-```
-
-**What it does**:
-- Implements the Envy Cycle Elimination algorithm
-- Guarantees EF1 property by construction
-- Saves to `results/evaluation_results_10_{m}_100000_ece.csv`
-
-#### 7. Max Utilitarian Welfare Baseline
-
-```bash
-./run_max_util_baseline.sh
-```
-
-**What it does**:
-- Greedy allocation: each item goes to the agent that values it most
-- Maximizes total utility (100% utilitarian welfare)
-- Very fast (O(n*m) per matrix)
-- Poor fairness (often ~0% EF1)
-- Saves to `results/evaluation_results_10_{m}_100000_max_util.csv`
-
-#### 8. Max Nash Welfare Baseline
-
-```bash
-./run_max_nash_baseline.sh
-```
-
-**What it does**:
-- Uses Gurobi LP with piecewise linear approximation to maximize Nash welfare
-- Produces allocations that balance efficiency and fairness
-- **WARNING**: Slow (~seconds per matrix, hours for full dataset)
-- Saves to `results/evaluation_results_10_{m}_100000_max_nash.csv`
-
-#### 9. EF1 Repair Post-Processing
-
-EF1 repair is a post-processing step that fixes EF1 violations in any allocation by transferring items between agents. Several baselines can be combined with EF1 repair:
+EF1 repair fixes EF1 violations in any allocation:
 
 ```bash
 # Model + EF1 Repair
 ./run_ef1_repair.sh
 
-# Random + EF1 Repair
-# (run via Python script)
-uv run eval_pipeline/run_random_ef1_repair.py
-
-# Max Utilitarian + EF1 Repair
+# MaxUtil + EF1 Repair
 ./run_max_util_ef1_repair.sh
-
-# Max Nash + EF1 Repair
-./run_max_nash_ef1_repair.sh
-```
-
-**How EF1 repair works**:
-1. Identifies pairs of agents where one envies the other even after removing any single item
-2. Transfers items to reduce envy while maintaining/improving Nash welfare
-3. Repeats until no EF1 violations remain (or max passes reached)
-4. Guarantees 100% EF1 satisfaction after repair
-
-**Key findings**:
-- EF1 repair dramatically improves fairness with minimal welfare loss
-- MaxUtil+EF1: 100% EF1 with ~90-96% utility preserved
-- Model+EF1: 100% EF1 with improved Nash welfare
-
-#### Complete Evaluation Workflow
-
-Run the full evaluation pipeline:
-
-```bash
-cd eval_pipeline
-
-# 1. Evaluate model (with and without EF1 repair)
-./run_all_evaluations.sh
-./run_ef1_repair.sh
-
-# 2. Evaluate baselines (can run in parallel)
-./run_random_baseline.sh &
-./run_rr_baseline.sh &
-./run_ece_baseline.sh &
-./run_max_util_baseline.sh &
-./run_max_util_ef1_repair.sh &
-wait
-
-# 3. (Optional) Max Nash baseline - WARNING: very slow!
-# ./run_max_nash_baseline.sh
-# ./run_max_nash_ef1_repair.sh
-
-# 4. Generate comparison and plots
-uv run compare_results.py
-uv run analyze_and_plot.py
-
-# Results available in results/ directory
-ls -lh results/
-```
-
-**Expected runtime**:
-- Model evaluation: ~5-10 minutes (depends on GPU)
-- Model+EF1: ~10-15 minutes
-- Random baseline: ~1 minute (very fast)
-- Round-robin baseline: ~3-5 minutes (greedy selection)
-- ECE baseline: ~10-20 minutes (envy cycle detection)
-- MaxUtil baseline: ~1 minute (greedy, vectorized)
-- MaxUtil+EF1: ~5-10 minutes
-- MaxNash baseline: **Several hours** (Gurobi LP per matrix)
-- MaxNash+EF1: **Several hours** (Gurobi LP + repair)
-- Analysis & plotting: <1 minute
-
-#### Script Configuration
-
-All scripts process datasets matching pattern `datasets/10_{m}_100000_dataset.npz`. To modify:
-
-**Change dataset range** (e.g., only m=15 to m=18):
-```bash
-# Edit the shell script
-for m in {15..18}; do
-    dataset="datasets/10_${m}_100000_dataset.npz"
-    ...
-done
-```
-
-**Change batch size**:
-```bash
-# In the shell scripts, modify:
-uv run eval_pipeline/evaluation.py "$dataset" \
-    --eval_type model \
-    --model_config eval_pipeline/best_model_config.json \
-    --batch_size 256  # Change from default 100
-```
-
-**Use different model config**:
-```bash
-# In run_all_evaluations.sh, change:
---model_config eval_pipeline/my_custom_config.json
 ```
 
 ---
 
 ## API Reference
 
-### FATransformer
+### FFTransformerResidual
 
 ```python
-class FATransformer(
+class FFTransformerResidual(
     n: int,                          # Number of agents
     m: int,                          # Number of items
     d_model: int,                    # Embedding dimension
     num_heads: int,                  # Attention heads
     num_output_layers: int = 1,      # Output transformer layers
+    num_encoder_layers: int = 1,     # Encoder transformer layers
     dropout: float = 0.0,            # Dropout rate
     initial_temperature: float = 1.0,# Starting softmax temperature
     final_temperature: float = 0.01  # Eval mode temperature
@@ -686,7 +485,6 @@ class FATransformer(
 - `forward(x: torch.Tensor) -> torch.Tensor`
   - Input: `x` of shape `(batch, n, m)` - valuation matrices
   - Output: `(batch, m, n)` - allocation probabilities
-  - Handles variable `m` via padding (if `m < self.m`)
 
 - `update_temperature(temperature: float)`
   - Manually set softmax temperature (used during training)
@@ -696,7 +494,7 @@ class FATransformer(
 
 **Example**:
 ```python
-model = FATransformer(n=10, m=20, d_model=256, num_heads=8, num_output_layers=2)
+model = FFTransformerResidual(n=10, m=20, d_model=256, num_heads=8, num_output_layers=2)
 valuations = torch.rand(4, 10, 20)
 allocations = model(valuations)  # (4, 20, 10)
 ```
@@ -730,8 +528,8 @@ loss = -nw  # Maximize Nash welfare
 
 For building custom architectures:
 
-- `FASelfAttentionBlock(d_model, num_heads, dropout)`: Self-attention + GLU
-- `FACrossAttentionBlock(d_model, num_heads, dropout)`: Cross-attention + GLU
+- `FFSelfAttentionBlock(d_model, num_heads, dropout)`: Self-attention + GLU
+- `FFCrossAttentionBlock(d_model, num_heads, dropout)`: Cross-attention + GLU
 - `MHA(d_model, num_heads, dropout)`: Multi-head attention
 - `GLU(input_dim, intermediate_dim, output_dim)`: Gated linear unit
 
@@ -804,17 +602,20 @@ Values close to 1.0 indicate near-optimal performance.
 
 ```
 fair-allocation-transformer/
-├── fatransformer/              # Main model package
+├── fftransformer/              # Main model package
 │   ├── __init__.py            # Package exports
-│   ├── fatransformer.py       # Standard FATransformer (RECOMMENDED)
-│   ├── fatransformer_exchangeable.py  # Experimental variant
+│   ├── fftransformer.py       # Linear FFTransformer
+│   ├── fftransformer_exchangeable.py  # Experimental variant
+│   ├── fftransformer_residual.py      # RECOMMENDED variant
 │   ├── attention_blocks.py    # Self/Cross attention blocks
 │   ├── model_components.py    # GLU, MHA components
 │   ├── exchangeable_layer.py  # Permutation-equivariant layers
 │   └── helpers.py             # Nash welfare computation
 │
 ├── training/                   # Training scripts
-│   └── bayesian_sweep.py      # W&B hyperparameter sweep
+│   ├── train_residual.py      # Production training for residual model
+│   ├── bayesian_sweep_residual.py  # W&B hyperparameter sweep
+│   └── bayesian_sweep_30_60.py     # Sweep for 30x60 problems
 │
 ├── eval_pipeline/              # Evaluation framework
 │   ├── README.md              # Detailed evaluation docs
@@ -824,18 +625,13 @@ fair-allocation-transformer/
 │   ├── auto_run_evals.py      # Batch evaluation runner
 │   └── utils/                 # Helper utilities
 │
+├── configs/                    # Configuration files
+│   ├── best_from_sweep_residual.yaml  # Best hyperparameters
+│   └── residual_30_60.yaml           # Config for 30x60 training
+│
 ├── notebooks/                  # Experimental notebooks
-│   ├── README.md              # Notebook documentation
-│   ├── training/              # Training experiments
-│   ├── set_transformer/       # Alternative architecture tests
-│   └── test_exchange.ipynb    # Exchangeable layer experiments
-│
 ├── set_transformer/            # Experimental baseline (Set Transformer)
-│   ├── __init__.py
-│   └── set_transformer.py     # MAB, SAB, ISAB, PMA blocks
-│
 ├── benchmarks/                 # Performance benchmarks
-│   └── benchmark_exchangeable_layers.py
 │
 ├── README.md                   # This file
 ├── pyproject.toml             # Dependencies and package config
@@ -845,11 +641,10 @@ fair-allocation-transformer/
 
 ### Key Directories
 
-- **fatransformer/**: Core model implementation, use `from fatransformer import FATransformer`
-- **training/**: Use `bayesian_sweep.py` for hyperparameter tuning
+- **fftransformer/**: Core model implementation, use `from fftransformer import FFTransformerResidual`
+- **training/**: Use `train_residual.py` for production training
 - **eval_pipeline/**: Complete evaluation workflow, see `eval_pipeline/README.md`
-- **notebooks/**: Research notebooks, not for production
-- **set_transformer/**: Alternative architecture for comparison
+- **configs/**: Best hyperparameter configurations
 
 ---
 
@@ -857,12 +652,11 @@ fair-allocation-transformer/
 
 ### Import Errors
 
-**Problem**: `ModuleNotFoundError: No module named 'fatransformer'`
+**Problem**: `ModuleNotFoundError: No module named 'fftransformer'`
 
 **Solution**: Install package dependencies:
 ```bash
 uv sync
-# Or with pip: pip install -e .
 ```
 
 ### CUDA Out of Memory
@@ -870,8 +664,8 @@ uv sync
 **Problem**: `RuntimeError: CUDA out of memory`
 
 **Solutions**:
-1. Reduce batch size: `--batch_size 256` (default 512)
-2. Reduce model size: `d_model=512` instead of 768
+1. Reduce batch size: `--batch-size 256` (default 512)
+2. Reduce model size: `d_model=128` instead of 256
 3. Use gradient accumulation (modify training script)
 4. Use CPU: Model works on CPU, just slower
 
@@ -911,17 +705,8 @@ wandb login
 1. Check temperature: Should anneal to ~0.01 for discrete allocations
 2. Verify input shape: `(batch, n, m)` valuations → `(batch, m, n)` allocations
 3. Ensure Nash welfare is negated in loss: `loss = -get_nash_welfare(...)`
-4. Check learning rate: Typical range [3e-5, 3e-4]
+4. Check learning rate: Typical range [1e-4, 3e-3]
 5. Increase training steps or model capacity
-
-### Notebooks Not Running
-
-**Problem**: Old notebooks fail with import errors
-
-**Solution**: Notebooks in `notebooks/` are experimental snapshots. For stable code:
-- Use `fatransformer` package imports
-- Run `training/bayesian_sweep.py` for training
-- Use `eval_pipeline/` for evaluation
 
 ---
 

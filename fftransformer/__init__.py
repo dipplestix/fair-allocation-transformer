@@ -5,11 +5,12 @@ in discrete fair division problems.
 """
 
 # Main models
-from .fatransformer import FATransformer
-from .fatransformer_exchangeable import FATransformer as FATransformerExchangeable
+from .fftransformer import FFTransformer
+from .fftransformer_exchangeable import FFTransformerExchangeable
+from .fftransformer_residual import FFTransformerResidual
 
 # Core components
-from .attention_blocks import FASelfAttentionBlock, FACrossAttentionBlock
+from .attention_blocks import FFSelfAttentionBlock, FFCrossAttentionBlock
 from .model_components import GLU, MHA
 from .exchangeable_layer import (
     ExchangeableLayer,
@@ -24,11 +25,12 @@ from .helpers import get_nash_welfare
 
 __all__ = [
     # Models
-    "FATransformer",
-    "FATransformerExchangeable",
+    "FFTransformer",
+    "FFTransformerExchangeable",
+    "FFTransformerResidual",
     # Attention blocks
-    "FASelfAttentionBlock",
-    "FACrossAttentionBlock",
+    "FFSelfAttentionBlock",
+    "FFCrossAttentionBlock",
     # Components
     "GLU",
     "MHA",

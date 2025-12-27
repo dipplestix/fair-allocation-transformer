@@ -3,7 +3,7 @@ import torch
 from .model_components import GLU, MHA
 
 
-class FASelfAttentionBlock(nn.Module):
+class FFSelfAttentionBlock(nn.Module):
     def __init__(self, d_model: int, num_heads: int, dropout: float = 0.0):
         super().__init__()
 
@@ -19,7 +19,7 @@ class FASelfAttentionBlock(nn.Module):
         x = x + self.glu(self.glu_norm(x))
         return x
     
-class FACrossAttentionBlock(nn.Module):
+class FFCrossAttentionBlock(nn.Module):
     def __init__(self, d_model: int, num_heads: int, dropout: float = 0.0):
         super().__init__()
 
