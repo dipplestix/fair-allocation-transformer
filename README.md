@@ -4,8 +4,8 @@
 
 This repository contains the research code accompanying the working paper
 "FairFormer: A transformer architecture for discrete fair division". The model
-implements the two-tower, symmetry-aware transformer described in the draft
-AAMAS 2026 submission and provides utilities for computing Nash welfare during
+implements the two-tower, symmetry-aware transformer described in our draft
+ICML submission and provides utilities for computing Nash welfare during
 training.
 
 ## Table of Contents
@@ -20,9 +20,8 @@ training.
 8. [API Reference](#api-reference)
 9. [Fairness Metrics](#fairness-metrics)
 10. [Project Structure](#project-structure)
-11. [Troubleshooting](#troubleshooting)
-12. [Citation](#citation)
-13. [License](#license)
+11. [Citation](#citation)
+12. [License](#license)
 
 ---
 
@@ -32,7 +31,7 @@ Get started in 5 minutes:
 
 ```bash
 # Clone and install
-git clone https://github.com/dipplestix/fair-allocation-transformer.git
+git clone https://github.com/<username>/fair-allocation-transformer.git
 cd fair-allocation-transformer
 
 # Install uv if not already installed
@@ -629,7 +628,6 @@ fair-allocation-transformer/
 │   ├── best_from_sweep_residual.yaml  # Best hyperparameters
 │   └── residual_30_60.yaml           # Config for 30x60 training
 │
-├── notebooks/                  # Experimental notebooks
 ├── set_transformer/            # Experimental baseline (Set Transformer)
 ├── benchmarks/                 # Performance benchmarks
 │
@@ -648,68 +646,6 @@ fair-allocation-transformer/
 
 ---
 
-## Troubleshooting
-
-### Import Errors
-
-**Problem**: `ModuleNotFoundError: No module named 'fftransformer'`
-
-**Solution**: Install package dependencies:
-```bash
-uv sync
-```
-
-### CUDA Out of Memory
-
-**Problem**: `RuntimeError: CUDA out of memory`
-
-**Solutions**:
-1. Reduce batch size: `--batch-size 256` (default 512)
-2. Reduce model size: `d_model=128` instead of 256
-3. Use gradient accumulation (modify training script)
-4. Use CPU: Model works on CPU, just slower
-
-### Gurobi License (Eval Pipeline)
-
-**Problem**: `GurobiError: Model is too large for size-limited license`
-
-**Solution**: The evaluation pipeline uses Gurobi to compute optimal welfare. Options:
-1. Get free academic license: https://www.gurobi.com/academia/
-2. Use smaller datasets (`--num_matrices 1000` instead of 100000)
-3. Skip optimal welfare computation (modify `generate_dataset.py`)
-
-### W&B Login Issues
-
-**Problem**: `wandb: ERROR Failed to authenticate`
-
-**Solution**:
-```bash
-wandb login
-# Enter your W&B API key from https://wandb.ai/authorize
-```
-
-### Temperature Not Decreasing
-
-**Problem**: Allocations remain smooth during training
-
-**Solution**:
-- Ensure you call `model.update_temperature(new_temp)` during training
-- In eval mode, `model.eval()` automatically sets `temperature = final_temperature`
-- Check temperature schedule in training loop
-
-### Poor Performance
-
-**Problem**: Low Nash welfare or fairness metrics
-
-**Debugging**:
-1. Check temperature: Should anneal to ~0.01 for discrete allocations
-2. Verify input shape: `(batch, n, m)` valuations → `(batch, m, n)` allocations
-3. Ensure Nash welfare is negated in loss: `loss = -get_nash_welfare(...)`
-4. Check learning rate: Typical range [1e-4, 3e-3]
-5. Increase training steps or model capacity
-
----
-
 ## Citation
 
 If you use FairFormer in your research, please cite:
@@ -718,13 +654,13 @@ If you use FairFormer in your research, please cite:
 @article{fairformer2026,
   title={FairFormer: A Transformer Architecture for Discrete Fair Division},
   author={[Author Names]},
-  journal={AAMAS},
+  journal={ICML},
   year={2026},
-  note={Working paper, preprint in preparation}
+  note={Draft submission}
 }
 ```
 
-**Status**: Draft submission to AAMAS 2026. Preprint link will be added upon publication.
+**Status**: Draft submission to ICML 2026.
 
 ---
 
