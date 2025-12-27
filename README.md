@@ -237,7 +237,7 @@ uv run python -c "from fftransformer import FFTransformerResidual; print('✓ In
 
 ## Model Variants
 
-FairFormer includes three variants - use **FFTransformerResidual** for best performance.
+FairFormer includes two variants - use **FFTransformerResidual** for best performance.
 
 ### FFTransformerResidual (Recommended)
 
@@ -273,32 +273,16 @@ from fftransformer import FFTransformerResidual
 from fftransformer import FFTransformer
 ```
 
-### FFTransformerExchangeable (Experimental)
-
-**File**: `fftransformer/fftransformer_exchangeable.py`
-
-**When to use**: Research on permutation equivariance, experimental only
-
-**Features**:
-- `ExchangeableLayer` with pooling operations (row/column/global mean/min/max)
-- Bilinear output layer (dot product of item & agent embeddings)
-- Enforces stricter equivariance properties
-
-**Import**:
-```python
-from fftransformer import FFTransformerExchangeable
-```
-
 ### Comparison Table
 
-| Feature | Residual (Recommended) | Linear | Exchangeable |
-|---------|------------------------|--------|--------------|
-| Projection layers | ExchangeableLayer | Linear | ExchangeableLayer |
-| Output layer | Bilinear + Residual | Linear | Bilinear |
-| Residual connection | ✓ Yes | No | No |
-| Performance | ✓ Best | Good | Experimental |
-| Size-agnostic | ✓ Yes | Limited | ✓ Yes |
-| Recommended use | Production | Baseline | Research |
+| Feature | Residual (Recommended) | Linear |
+|---------|------------------------|--------|
+| Projection layers | ExchangeableLayer | Linear |
+| Output layer | Bilinear + Residual | Linear |
+| Residual connection | ✓ Yes | No |
+| Performance | ✓ Best | Good |
+| Size-agnostic | ✓ Yes | Limited |
+| Recommended use | Production | Baseline |
 
 ---
 
@@ -604,7 +588,6 @@ fair-allocation-transformer/
 ├── fftransformer/              # Main model package
 │   ├── __init__.py            # Package exports
 │   ├── fftransformer.py       # Linear FFTransformer
-│   ├── fftransformer_exchangeable.py  # Experimental variant
 │   ├── fftransformer_residual.py      # RECOMMENDED variant
 │   ├── attention_blocks.py    # Self/Cross attention blocks
 │   ├── model_components.py    # GLU, MHA components

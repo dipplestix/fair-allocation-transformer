@@ -6,7 +6,6 @@ in discrete fair division problems.
 
 # Main models
 from .fftransformer import FFTransformer
-from .fftransformer_exchangeable import FFTransformerExchangeable
 from .fftransformer_residual import FFTransformerResidual
 
 # Core components
@@ -26,7 +25,6 @@ from .helpers import get_nash_welfare
 __all__ = [
     # Models
     "FFTransformer",
-    "FFTransformerExchangeable",
     "FFTransformerResidual",
     # Attention blocks
     "FFSelfAttentionBlock",
