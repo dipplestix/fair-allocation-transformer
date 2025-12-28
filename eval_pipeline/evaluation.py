@@ -7,6 +7,28 @@ from utils.calculations import calculate_agent_bundle_values_batch, is_envy_free
 from utils.inference import get_model_allocations_batch, get_random_allocations_batch, get_rr_allocations_batch, get_rr_allocations_batch_old, get_ece_allocations_batch, get_crr_allocations_batch, get_max_util_allocations_batch, get_max_nash_allocations_batch
 from utils.load_model import load_model
 import time
+import os
+
+
+def get_results_subfolder(eval_type):
+    """Determine the results subfolder based on evaluation type."""
+    if eval_type.startswith('model'):
+        return 'model'
+    elif eval_type.startswith('random'):
+        return 'random'
+    elif eval_type == 'rr':
+        return 'rr'
+    elif eval_type == 'ece':
+        return 'ece'
+    elif eval_type == 'crr':
+        return 'crr'
+    elif eval_type.startswith('max_util'):
+        return 'max_util'
+    elif eval_type.startswith('max_nash'):
+        return 'max_nash'
+    else:
+        return ''  # fallback to root results folder
+
 
 def evaluate_single_allocation(valuation_matrix, allocation_matrix, max_nash_welfare, max_util_welfare):
     """Evaluate a single allocation with precomputed max welfare values"""
@@ -83,6 +105,11 @@ def run_evaluation(data_file, output_csv, output_npz, batch_size=100, eval_type=
     print(f"Dataset loaded: {len(matrices)} matrices")
     print(f"Matrix shape: {matrices[0].shape}")
 
+    # Determine output subfolder
+    subfolder = get_results_subfolder(eval_type)
+    results_dir = os.path.join("results", subfolder) if subfolder else "results"
+    os.makedirs(results_dir, exist_ok=True)
+
     if eval_type.startswith('model'):
         print(f"Loading model for config file: {model_config}...")
         model, model_name = load_model(model_config)
@@ -93,11 +120,11 @@ def run_evaluation(data_file, output_csv, output_npz, batch_size=100, eval_type=
         else:
             suffix = model_name
 
-        output_csv = "results/" + output_csv + "_" + data_file[0] + "_" + data_file[1] + "_" + data_file[2] + "_" + suffix + ".csv"
-        output_npz = "results/" + output_npz + "_" + data_file[0] + "_" + data_file[1] + "_" + data_file[2] + "_" + suffix + ".npz"
+        output_csv = os.path.join(results_dir, f"{output_csv}_{data_file[0]}_{data_file[1]}_{data_file[2]}_{suffix}.csv")
+        output_npz = os.path.join(results_dir, f"{output_npz}_{data_file[0]}_{data_file[1]}_{data_file[2]}_{suffix}.npz")
     else:
-        output_csv = "results/" + output_csv + "_" + data_file[0] + "_" + data_file[1] + "_" + data_file[2] + "_" + eval_type + ".csv"
-        output_npz = "results/" + output_npz + "_" + data_file[0] + "_" + data_file[1] + "_" + data_file[2] + "_" + eval_type + ".npz"
+        output_csv = os.path.join(results_dir, f"{output_csv}_{data_file[0]}_{data_file[1]}_{data_file[2]}_{eval_type}.csv")
+        output_npz = os.path.join(results_dir, f"{output_npz}_{data_file[0]}_{data_file[1]}_{data_file[2]}_{eval_type}.npz")
 
 
     all_results = []

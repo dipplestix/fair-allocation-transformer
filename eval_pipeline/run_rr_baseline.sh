@@ -34,5 +34,5 @@ done
 
 echo -e "${BLUE}Round-robin baseline evaluations complete!${NC}"
 echo ""
-echo "Results saved to: results/"
-ls -lh results/*_rr.csv
+echo "Results saved to: results/rr/"
+ls -lh results/rr/*_rr.csv

@@ -35,5 +35,5 @@ done
 
 echo -e "${BLUE}All evaluations complete!${NC}"
 echo ""
-echo "Results saved to: results/"
-ls -lh results/*.csv
+echo "Results saved to: results/model/"
+ls -lh results/model/*.csv 2>/dev/null || echo "No results found yet"

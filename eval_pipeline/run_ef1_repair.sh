@@ -19,3 +19,6 @@ do
 done
 
 echo "All EF1 Quick Repair evaluations complete!"
+echo ""
+echo "Results saved to: results/model/"
+ls -lh results/model/*_with_ef1_repair.csv 2>/dev/null || echo "No results found yet"
