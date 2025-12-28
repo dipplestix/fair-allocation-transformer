@@ -34,5 +34,5 @@ done
 
 echo -e "${BLUE}Random baseline evaluations complete!${NC}"
 echo ""
-echo "Results saved to: results/"
-ls -lh results/*_random.csv
+echo "Results saved to: results/random/"
+ls -lh results/random/*_random.csv

@@ -34,5 +34,5 @@ done
 
 echo -e "${BLUE}Max utilitarian welfare baseline evaluations complete!${NC}"
 echo ""
-echo "Results saved to: results/"
-ls -lh results/*_max_util.csv 2>/dev/null || echo "No results found yet"
+echo "Results saved to: results/max_util/"
+ls -lh results/max_util/*_max_util.csv 2>/dev/null || echo "No results found yet"

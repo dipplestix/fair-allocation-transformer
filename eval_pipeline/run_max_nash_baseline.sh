@@ -37,5 +37,5 @@ done
 
 echo -e "${BLUE}Max Nash welfare baseline evaluations complete!${NC}"
 echo ""
-echo "Results saved to: results/"
-ls -lh results/*_max_nash.csv 2>/dev/null || echo "No results found yet"
+echo "Results saved to: results/max_nash/"
+ls -lh results/max_nash/*_max_nash.csv 2>/dev/null || echo "No results found yet"

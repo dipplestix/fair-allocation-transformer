@@ -34,5 +34,5 @@ done
 
 echo -e "${BLUE}ECE baseline evaluations complete!${NC}"
 echo ""
-echo "Results saved to: results/"
-ls -lh results/*_ece.csv
+echo "Results saved to: results/ece/"
+ls -lh results/ece/*_ece.csv

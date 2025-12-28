@@ -41,5 +41,5 @@ done
 
 echo -e "${BLUE}C-RR baseline evaluations complete!${NC}"
 echo ""
-echo "Results saved to: results/"
-ls -lh results/*_crr.csv 2>/dev/null || echo "No results found yet"
+echo "Results saved to: results/crr/"
+ls -lh results/crr/*_crr.csv 2>/dev/null || echo "No results found yet"
