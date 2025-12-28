@@ -11,17 +11,16 @@ training.
 ## Table of Contents
 
 1. [Quick Start](#quick-start)
-2. [Fair Division Problem](#fair-division-problem)
-3. [Architecture](#architecture)
-4. [Installation](#installation)
-5. [Model Variants](#model-variants)
-6. [Training](#training)
-7. [Evaluation Pipeline](#evaluation-pipeline)
-8. [API Reference](#api-reference)
-9. [Fairness Metrics](#fairness-metrics)
-10. [Project Structure](#project-structure)
-11. [Citation](#citation)
-12. [License](#license)
+2. [Architecture](#architecture)
+3. [Installation](#installation)
+4. [Model Variants](#model-variants)
+5. [Training](#training)
+6. [Evaluation Pipeline](#evaluation-pipeline)
+7. [API Reference](#api-reference)
+8. [Fairness Metrics](#fairness-metrics)
+9. [Project Structure](#project-structure)
+10. [Citation](#citation)
+11. [License](#license)
 
 ---
 
@@ -58,31 +57,6 @@ print(f'Nash Welfare: {nw.item():.4f}')
 
 ---
 
-## Fair Division Problem
-
-**Problem**: Allocate `m` indivisible items among `n` agents with heterogeneous valuations.
-
-**Input**: Valuation matrix `V ∈ R^(n×m)` where `V[i,j]` = agent `i`'s value for item `j`
-
-**Output**: Allocation matrix `A ∈ [0,1]^(m×n)` where `A[j,i]` = probability item `j` goes to agent `i`
-- Each row sums to 1 (each item allocated to exactly one agent)
-- Fractional allocations represent lottery distributions
-
-**Objective**: Maximize Nash welfare (geometric mean of agent utilities) while learning patterns from data.
-
-### Why Neural Networks?
-
-Traditional fair division algorithms (MNW, round-robin) are:
-- Computationally expensive for large instances
-- Don't generalize across problem sizes
-- Can't leverage patterns in valuation distributions
-
-FairFormer learns to produce high-welfare allocations efficiently through:
-- Amortized inference (fast at test time)
-- Pattern recognition in valuation structures
-- Differentiable allocation via softmax with temperature annealing
-
----
 
 ## Architecture
 
@@ -679,9 +653,3 @@ If you use FairFormer in your research, please cite:
 ## License
 
 This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
-
-## Acknowledgments
-
-- Built with PyTorch and Weights & Biases
-- Fairness metrics implementation based on economics literature
-- Gurobi optimization for computing optimal welfare baselines
