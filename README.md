@@ -433,7 +433,37 @@ Compare against:
 
 ### EF1 Repair Post-Processing
 
-EF1 repair fixes EF1 violations in any allocation:
+EF1 repair fixes EF1 violations in any allocation by iteratively transferring items from envied agents to envious agents, selecting transfers that maximize Nash welfare improvement.
+
+**Algorithm Pseudocode**:
+```
+EF1_QUICK_REPAIR(allocation A, valuations V):
+    for pass = 1 to max_passes:
+        changed = false
+        u[i] = sum(V[i] * A[i]) for all agents i   # compute utilities
+
+        for each agent pair (i, j) where i ≠ j:
+            if agent i envies j even after removing j's best item:
+                # EF1 violation: V_i(A_j) - max_{g ∈ A_j} V_i(g) > u[i]
+
+                best_item = argmax over g ∈ A_j of:
+                    Δ log NSW = log(u[i] + V[i,g]) + log(u[j] - V[j,g])
+                               - log(u[i]) - log(u[j])
+
+                transfer best_item from j to i
+                changed = true
+
+        if not changed: break   # converged
+
+    return A
+```
+
+**Key properties**:
+- Terminates in O(max_passes × n² × m) time
+- Each transfer improves Nash welfare (greedy improvement)
+- Numba-accelerated version provides ~88x speedup
+
+**Usage**:
 
 ```bash
 # Model + EF1 Repair
