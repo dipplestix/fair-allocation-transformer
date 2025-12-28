@@ -20,7 +20,8 @@ training.
 8. [Fairness Metrics](#fairness-metrics)
 9. [Project Structure](#project-structure)
 10. [Citation](#citation)
-11. [License](#license)
+11. [AI Acknowledgment](#ai-acknowledgment)
+12. [License](#license)
 
 ---
 
@@ -647,6 +648,14 @@ If you use FairFormer in your research, please cite:
 ```
 
 **Status**: Draft submission to ICML 2026.
+
+---
+
+## AI Acknowledgment
+
+This project was developed with assistance from Claude (Anthropic). The core FairFormer architecture—including the two-tower transformer design, exchangeable layers, bilinear output mechanism, and residual connections—was conceived and designed by the human authors.
+
+Claude contributed to the development of training infrastructure, evaluation pipelines, and supporting tooling, accelerating the research iteration cycle while the architectural innovations remained human-driven.
 
 ---
 
