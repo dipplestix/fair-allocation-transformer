@@ -1,0 +1,37 @@
+# Best configuration from wandb sweep for FFTransformerResidual
+# Sweep ID: r5k1oo61
+# Sweep URL: https://wandb.ai/dieplstks/fa-transformer-30-60-sweep/sweeps/r5k1oo61
+# Best run: s5x3r4a5
+# Best run URL: https://wandb.ai/dieplstks/fa-transformer-30-60-sweep/runs/s5x3r4a5
+# Best Nash welfare: 1.820175
+# Final residual scale: 1.1287
+#
+# To train with this config:
+#   python training/train_residual.py --config configs/best_30_60_sweep.yaml
+
+n: 30
+m: 60
+d_model: 512
+num_heads: 4
+num_output_layers: 3
+num_encoder_layers: 3
+dropout: 0.13616392754196202
+pool_config_name: all
+residual_scale_init: 0.6606053115473633
+lr: 7.782205501315907e-05
+weight_decay: 3.327447427701187e-05
+batch_size: 256
+steps: 100000
+initial_temperature: 0.7317159943033023
+final_temperature: 0.05123322412781463
+grad_clip_norm: 1
+seed: 42
+checkpoint_dir: checkpoints/residual/from_sweep_s5x3r4a5
+checkpoint_every: 5000
+keep_checkpoints: 3
+val_every: 1000
+val_size: 1000
+patience: 40
+min_delta: 1.0e-05
+wandb_project: fa-transformer-residual-production
+run_name: production_residual_from_sweep_s5x3r4a5
