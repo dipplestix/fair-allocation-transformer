@@ -25,20 +25,33 @@ from utils.inference import get_model_allocations_batch
 from utils.ef1_repair import ef1_quick_repair_batch
 
 
-def load_model(checkpoint_path, device, d_model):
-    """Load a FFTransformerResidual model."""
+def load_model_30_60(device):
+    """Load the 30x60 FFTransformerResidual model."""
     from fftransformer.fftransformer_residual import FFTransformerResidual
 
     model = FFTransformerResidual(
-        d_model=d_model, num_heads=8,
-        num_output_layers=2, dropout=0.0,
-        initial_temperature=1.0, final_temperature=0.01
+        d_model=512, num_heads=4, num_output_layers=3, num_encoder_layers=3,
+        dropout=0.136, initial_temperature=0.73, final_temperature=0.051,
     )
-
-    model.load_state_dict(torch.load(checkpoint_path, map_location=device))
+    weights_path = project_root / "checkpoints" / "residual" / "from_sweep_s5x3r4a5" / "best_model.pt"
+    model.load_state_dict(torch.load(weights_path, map_location=device, weights_only=True))
     model.to(device)
     model.eval()
+    return model
 
+
+def load_model_10_20(device):
+    """Load the 10x20 FFTransformerResidual model."""
+    from fftransformer.fftransformer_residual import FFTransformerResidual
+
+    model = FFTransformerResidual(
+        d_model=768, num_heads=4, num_output_layers=4, num_encoder_layers=3,
+        dropout=0.071, initial_temperature=1.77, final_temperature=0.054,
+    )
+    weights_path = project_root / "checkpoints" / "residual" / "from_sweep_pt1hesbo" / "best_model.pt"
+    model.load_state_dict(torch.load(weights_path, map_location=device, weights_only=True))
+    model.to(device)
+    model.eval()
     return model
 
 
@@ -99,16 +112,10 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     print("Loading models...")
-    model_30_60 = load_model(
-        project_root / "checkpoints" / "residual_30_60" / "best_model.pt",
-        device, d_model=128
-    )
+    model_30_60 = load_model_30_60(device)
     print(f"  30x60 model: {sum(p.numel() for p in model_30_60.parameters()):,} params")
 
-    model_10_20 = load_model(
-        project_root / "checkpoints" / "residual" / "best_model.pt",
-        device, d_model=256
-    )
+    model_10_20 = load_model_10_20(device)
     print(f"  10x20 model: {sum(p.numel() for p in model_10_20.parameters()):,} params")
 
     # Build list of (n, m) pairs where m >= n

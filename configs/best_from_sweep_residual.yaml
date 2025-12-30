@@ -1,37 +1,37 @@
 # Best configuration from wandb sweep for FFTransformerResidual
-# Sweep ID: g1k2n7o6
-# Sweep URL: https://wandb.ai/dieplstks/fa-transformer-residual-sweep/sweeps/g1k2n7o6
-# Best run: ldhdpajt
-# Best run URL: https://wandb.ai/dieplstks/fa-transformer-residual-sweep/runs/ldhdpajt
-# Best Nash welfare: 1.711239
-# Final residual scale: 6.9900
+# Sweep ID: xe2m1s32
+# Sweep URL: https://wandb.ai/dieplstks/fa-transformer-10-20-sweep/sweeps/xe2m1s32
+# Best run: pt1hesbo
+# Best run URL: https://wandb.ai/dieplstks/fa-transformer-10-20-sweep/runs/pt1hesbo
+# Best Nash welfare: 1.716125
+# Final residual scale: 1.5008
 #
 # To train with this config:
 #   python training/train_residual.py --config configs/best_from_sweep_residual.yaml
 
 n: 10
 m: 20
-d_model: 128
-num_heads: 8
-num_output_layers: 2
+d_model: 768
+num_heads: 4
+num_output_layers: 4
 num_encoder_layers: 3
-dropout: 0.09918628095456948
+dropout: 0.07132127836798832
 pool_config_name: row_col
-residual_scale_init: 0.34560344700183276
-lr: 0.0028933400665682968
-weight_decay: 0.003062230822706729
-batch_size: 256
+residual_scale_init: 0.16795591081417777
+lr: 6.150410794576277e-05
+weight_decay: 1.1062928261493804e-05
+batch_size: 1024
 steps: 100000
-initial_temperature: 0.9325787187470638
-final_temperature: 0.09837512050934188
+initial_temperature: 1.7710417974260677
+final_temperature: 0.0543145226646888
 grad_clip_norm: 1
 seed: 42
-checkpoint_dir: checkpoints/residual/from_sweep_ldhdpajt
+checkpoint_dir: checkpoints/residual/from_sweep_pt1hesbo
 checkpoint_every: 5000
 keep_checkpoints: 3
 val_every: 1000
 val_size: 1000
-patience: 30
+patience: 50
 min_delta: 1.0e-05
 wandb_project: fa-transformer-residual-production
-run_name: production_residual_from_sweep_ldhdpajt
+run_name: production_residual_from_sweep_pt1hesbo
