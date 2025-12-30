@@ -1,0 +1,41 @@
+# Default configuration for variable size training
+# n is sampled from Uniform(10, 50) and m from Uniform(n, 50) each batch
+
+# Model architecture (size-agnostic)
+d_model: 256
+num_heads: 8
+num_output_layers: 2
+num_encoder_layers: 2
+dropout: 0.0
+pool_config_name: "row_col"
+residual_scale_init: 0.1
+
+# Training hyperparameters
+lr: 5e-4
+weight_decay: 1e-3
+batch_size: 128
+steps: 100000
+
+# Temperature schedule
+initial_temperature: 1.0
+final_temperature: 0.01
+
+# Training settings
+grad_clip_norm: 1.0
+seed: 0
+
+# Checkpointing
+checkpoint_dir: "checkpoints/variable_size"
+checkpoint_every: 5000
+keep_checkpoints: 3
+
+# Validation
+val_every: 1000
+val_size: 500
+
+# Early stopping
+patience: 50
+min_delta: 1e-5
+
+# Logging
+wandb_project: "fa-transformer-variable-size-production"
