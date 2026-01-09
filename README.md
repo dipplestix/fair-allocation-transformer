@@ -11,17 +11,18 @@ training.
 ## Table of Contents
 
 1. [Quick Start](#quick-start)
-2. [Architecture](#architecture)
-3. [Installation](#installation)
-4. [Model Variants](#model-variants)
-5. [Training](#training)
-6. [Evaluation Pipeline](#evaluation-pipeline)
-7. [API Reference](#api-reference)
-8. [Fairness Metrics](#fairness-metrics)
-9. [Project Structure](#project-structure)
-10. [Citation](#citation)
-11. [AI Acknowledgment](#ai-acknowledgment)
-12. [License](#license)
+2. [Pretrained Models](#pretrained-models)
+3. [Architecture](#architecture)
+4. [Installation](#installation)
+5. [Model Variants](#model-variants)
+6. [Training](#training)
+7. [Evaluation Pipeline](#evaluation-pipeline)
+8. [API Reference](#api-reference)
+9. [Fairness Metrics](#fairness-metrics)
+10. [Project Structure](#project-structure)
+11. [Citation](#citation)
+12. [AI Acknowledgment](#ai-acknowledgment)
+13. [License](#license)
 
 ---
 
@@ -55,6 +56,59 @@ nw = get_nash_welfare(valuations, allocations)
 print(f'Nash Welfare: {nw.item():.4f}')
 "
 ```
+
+---
+
+## Pretrained Models
+
+We provide three pretrained FairFormer checkpoints that achieve 96-97% of optimal Nash welfare:
+
+| Model | Training Size | Nash Welfare | Best For |
+|-------|---------------|--------------|----------|
+| `model_10x20.pt` | 10×20 | 96.62% | Small problems, fast inference |
+| `model_30x60.pt` | 30×60 | 96.81% | Larger problems |
+| `model_multi_objective.pt` | Mixed | 96.70% | General use (recommended) |
+
+### Download and Use
+
+```bash
+# Models are in the pretrained/ directory
+ls pretrained/
+# model_10x20.pt  model_30x60.pt  model_multi_objective.pt
+```
+
+```python
+import torch
+from fftransformer import FFTransformerResidual
+
+# Load multi-objective model (recommended)
+model = FFTransformerResidual(
+    d_model=256, num_heads=8, num_output_layers=2, num_encoder_layers=1
+)
+model.load_state_dict(torch.load('pretrained/model_multi_objective.pt', weights_only=True))
+model.eval()
+
+# Works with any problem size!
+valuations = torch.rand(1, 15, 25)  # 15 agents, 25 items
+allocations = model(valuations)     # (1, 25, 15)
+
+# Convert to discrete allocation
+discrete = allocations.argmax(dim=2)  # Each item → one agent
+```
+
+### With EF1 Repair (Guaranteed Fairness)
+
+```python
+from eval_pipeline.utils.ef1_repair import ef1_quick_repair_batch
+
+# Apply EF1 repair for guaranteed EF1 fairness
+discrete_alloc = torch.zeros_like(allocations)
+discrete_alloc.scatter_(2, allocations.argmax(dim=2, keepdim=True), 1)
+
+repaired = ef1_quick_repair_batch(valuations.numpy(), discrete_alloc.numpy())
+```
+
+See [`pretrained/README.md`](pretrained/README.md) for detailed model configurations and usage examples.
 
 ---
 
@@ -615,6 +669,12 @@ fair-allocation-transformer/
 ├── configs/                    # Configuration files
 │   ├── best_from_sweep_residual.yaml  # Best hyperparameters
 │   └── residual_30_60.yaml           # Config for 30x60 training
+│
+├── pretrained/                 # Pretrained model checkpoints
+│   ├── README.md              # Model configs and usage
+│   ├── model_10x20.pt         # Trained on 10 agents, 20 items
+│   ├── model_30x60.pt         # Trained on 30 agents, 60 items
+│   └── model_multi_objective.pt  # Trained on mixed sizes
 │
 ├── benchmarks/                 # Performance benchmarks
 │
