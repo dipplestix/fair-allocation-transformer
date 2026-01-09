@@ -126,6 +126,11 @@ checkpoints/
 *.h5
 *.hdf5
 
+# Exception: pretrained models are tracked
+!pretrained/
+!pretrained/*.pt
+!pretrained/README.md
+
 # Data files
 *.csv
 *.json
