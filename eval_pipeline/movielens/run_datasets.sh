@@ -12,7 +12,7 @@ for items in 5 6 7 8 9 10 11 12 13 14 15; do
             --csv raw_datasets/ratings.csv \
             --agents 5 \
             --items "$items" \
-            --num_matrices 100000 \
+            --num_matrices 10000 \
             > "logs/items_${items}.log" 2>&1
         echo "Finished items=$items."
     ) &
