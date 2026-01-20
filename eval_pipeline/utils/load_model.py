@@ -65,7 +65,11 @@ def load_model(model_config):
     except AttributeError:
         raise ValueError(f"Class {config['model_class_def']} not found in {module_path}")
    
-    model = ModelClass(config["n"], config["m"], config["d_model"], config["num_heads"], config["num_output_layers"], config["dropout"])
+    if config["model_class_def"] == "FFTransformerResidual":
+        model = ModelClass(config["d_model"], config["num_heads"], config["num_output_layers"], config["num_encoder_layers"], config["dropout"])
+    else:
+        model = ModelClass(config["n"], config["m"], config["d_model"], config["num_heads"], config["num_output_layers"], config["dropout"])
+    
     model.load_state_dict(torch.load(model_weights_file, map_location=device))
     model.to(device)
     model.eval()

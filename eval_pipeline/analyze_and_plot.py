@@ -11,12 +11,14 @@ def load_results():
     results_dir = Path('results')
     data = []
 
-    for m in range(10, 21):
-        dataset_pattern = f'10_{m}_100000'
+    for m in range(10, 18):
+        dataset_pattern = f'10_{m}_1000'
+        model_results_dir = results_dir / 'model'
 
         # Model results (without EF1 repair) - exclude files ending with _repair or _swaps
-        model_files = [f for f in results_dir.glob(f'evaluation_results_{dataset_pattern}_best_from_sweep_*.csv')
+        model_files = [f for f in results_dir.glob(f'evaluation_results_{dataset_pattern}_*.csv')
                        if not f.name.endswith('_repair.csv') and not f.name.endswith('_swaps.csv')]
+        model_files = None
         if model_files:
             df = pd.read_csv(model_files[0])
             summary = {
@@ -34,7 +36,7 @@ def load_results():
             data.append(summary)
 
         # Model + EF1 Repair results
-        ef1_files = list(results_dir.glob(f'evaluation_results_{dataset_pattern}_best_from_sweep_*_with_ef1_repair.csv'))
+        ef1_files = list(model_results_dir.glob(f'evaluation_results_{dataset_pattern}_*.csv'))
         if ef1_files:
             df = pd.read_csv(ef1_files[0])
             summary = {
@@ -53,6 +55,7 @@ def load_results():
 
         # Random baseline
         random_files = list(results_dir.glob(f'evaluation_results_{dataset_pattern}_random.csv'))
+        random_files = None
         if random_files:
             df = pd.read_csv(random_files[0])
             summary = {
@@ -87,8 +90,9 @@ def load_results():
             }
             data.append(summary)
 
+        ece_dir = results_dir / 'ece'
         # ECE baseline (Envy Cycle Elimination)
-        ece_files = list(results_dir.glob(f'evaluation_results_{dataset_pattern}_ece.csv'))
+        ece_files = list(ece_dir.glob(f'evaluation_results_{dataset_pattern}_ece.csv'))
         if ece_files:
             df = pd.read_csv(ece_files[0])
             summary = {
@@ -124,7 +128,8 @@ def load_results():
             data.append(summary)
 
         # C-RR baseline (Welfare-Constrained Round Robin)
-        crr_files = list(results_dir.glob(f'evaluation_results_{dataset_pattern}_crr.csv'))
+        crr_dir = results_dir / 'crr'
+        crr_files = list(crr_dir.glob(f'evaluation_results_{dataset_pattern}_crr.csv'))
         if crr_files:
             df = pd.read_csv(crr_files[0])
             summary = {
@@ -291,9 +296,13 @@ def create_plots(df):
         ax.set_xticks(range(10, 21))
 
         # Set y-axis limits based on metric
-        if metric in ['ef_pct', 'ef1_pct', 'efx_pct']:
+        if metric in ['efx_pct']:
             ax.set_ylim(-5, 105)
-        elif metric in ['utility_pct', 'nash_welfare_pct']:
+        elif metric in ['ef_pct']:
+            ax.set_ylim(-5, 40)
+        elif metric in ['ef1_pct', 'utility_pct', 'nash_welfare_pct']:
+            ax.set_ylim(70, 105)
+        elif metric in []:
             ax.set_ylim(0, 105)
 
     plt.tight_layout()

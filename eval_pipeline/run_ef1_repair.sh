@@ -3,14 +3,14 @@
 
 echo "Running EF1 Quick Repair evaluations on all datasets..."
 
-for m in {10..20}
+for m in {10..17}
 do
-    dataset="datasets/10_${m}_100000_dataset.npz"
+    dataset="datasets/movielens/10_${m}_1000_dataset.npz"
     echo "Processing dataset: $dataset"
 
-    uv run eval_pipeline/evaluation.py "$dataset" \
+    uv run evaluation.py "$dataset" \
         --eval_type model_with_ef1_repair \
-        --model_config eval_pipeline/best_model_config.json \
+        --model_config sample_config.json \
         --batch_size 100 \
         --ef1_repair_max_passes 10
 

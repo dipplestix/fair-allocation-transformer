@@ -29,15 +29,16 @@ def load_and_summarize(filepath):
 
 def main():
     results_dir = Path('results')
+    model_results_dir = results_dir / 'model'
 
     # Collect all results
     data = []
 
-    for m in range(10, 21):
-        dataset_pattern = f'10_{m}_100000'
+    for m in range(10, 18):
+        dataset_pattern = f'10_{m}_1000'
 
         # Model results
-        model_files = list(results_dir.glob(f'evaluation_results_{dataset_pattern}_best_from_sweep_*.csv'))
+        model_files = list(model_results_dir.glob(f'evaluation_results_{dataset_pattern}_*.csv'))
         if model_files:
             model_summary = load_and_summarize(model_files[0])
             model_summary['dataset'] = f'10_{m}'
