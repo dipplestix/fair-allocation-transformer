@@ -12,8 +12,8 @@ echo -e "${BLUE}Starting random baseline evaluation on datasets (10-20 items)...
 echo ""
 
 # Loop through datasets from 10_10 to 10_20
-for m in {10..20}; do
-    dataset="datasets/10_${m}_100000_dataset.npz"
+for m in {7..17}; do
+    dataset="datasets/movielens/7_${m}_1000_dataset.npz"
 
     if [ ! -f "$dataset" ]; then
         echo -e "${BLUE}Skipping $dataset (not found)${NC}"
@@ -23,7 +23,7 @@ for m in {10..20}; do
     echo -e "${GREEN}Evaluating (random): $dataset${NC}"
 
     # Run evaluation
-    uv run eval_pipeline/evaluation.py "$dataset" \
+    uv run evaluation.py "$dataset" \
         --eval_type random \
         --batch_size 100
 

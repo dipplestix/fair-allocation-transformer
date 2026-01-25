@@ -11,8 +11,8 @@ def load_results():
     results_dir = Path('results')
     data = []
 
-    for m in range(10, 18):
-        dataset_pattern = f'10_{m}_1000'
+    for m in range(7, 18):
+        dataset_pattern = f'7_{m}_1000'
         model_results_dir = results_dir / 'model'
 
         # Model results (without EF1 repair) - exclude files ending with _repair or _swaps
@@ -54,8 +54,9 @@ def load_results():
             data.append(summary)
 
         # Random baseline
-        random_files = list(results_dir.glob(f'evaluation_results_{dataset_pattern}_random.csv'))
-        random_files = None
+        random_dir = results_dir / 'random'
+        random_files = list(random_dir.glob(f'evaluation_results_{dataset_pattern}_random.csv'))
+        # random_files = None
         if random_files:
             df = pd.read_csv(random_files[0])
             summary = {
@@ -73,7 +74,8 @@ def load_results():
             data.append(summary)
 
         # RR baseline
-        rr_files = list(results_dir.glob(f'evaluation_results_{dataset_pattern}_rr.csv'))
+        rr_dir = results_dir / 'rr'
+        rr_files = list(rr_dir.glob(f'evaluation_results_{dataset_pattern}_rr.csv'))
         if rr_files:
             df = pd.read_csv(rr_files[0])
             summary = {
@@ -293,7 +295,7 @@ def create_plots(df):
         ax.set_title(title, fontsize=12, fontweight='bold')
         ax.legend(loc='best', fontsize=10)
         ax.grid(True, alpha=0.3)
-        ax.set_xticks(range(10, 21))
+        ax.set_xticks(range(7, 18))
 
         # Set y-axis limits based on metric
         if metric in ['efx_pct']:
@@ -327,7 +329,7 @@ def create_plots(df):
     ax2.set_ylabel('Average Runtime (ms per batch)', fontsize=12, fontweight='bold')
     ax2.legend(loc='best', fontsize=11)
     ax2.grid(True, alpha=0.3)
-    ax2.set_xticks(range(10, 21))
+    ax2.set_xticks(range(7, 18))
 
     plt.tight_layout()
 

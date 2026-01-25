@@ -3,9 +3,9 @@
 
 echo "Running EF1 Quick Repair evaluations on all datasets..."
 
-for m in {10..17}
+for m in {7..17}
 do
-    dataset="datasets/movielens/10_${m}_1000_dataset.npz"
+    dataset="datasets/movielens/7_${m}_1000_dataset.npz"
     echo "Processing dataset: $dataset"
 
     uv run evaluation.py "$dataset" \

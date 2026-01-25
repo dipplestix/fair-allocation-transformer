@@ -12,8 +12,8 @@ echo -e "${BLUE}Starting ECE baseline evaluation on datasets (10-20 items)...${N
 echo ""
 
 # Loop through datasets from 10_10 to 10_17
-for m in {10..17}; do
-    dataset="datasets/movielens/10_${m}_1000_dataset.npz"
+for m in {7..17}; do
+    dataset="datasets/movielens/7_${m}_1000_dataset.npz"
 
     if [ ! -f "$dataset" ]; then
         echo -e "${BLUE}Skipping $dataset (not found)${NC}"
