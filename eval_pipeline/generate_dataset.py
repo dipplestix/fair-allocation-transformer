@@ -11,8 +11,53 @@ def generate_valuation_matrix(n_agents, m_items):
     return np.random.uniform(0, 1, size=(n_agents, m_items))
 
 
-def generate_dataset(n_agents, n_items, num_matrices, output_file, seed=10):
-    """Generate dataset of valuation matrices with precomputed max welfare values"""
+def generate_correlated_valuation_matrix(n_agents, m_items, rank=3, noise_scale=0.1):
+    """
+    Generate valuation matrix with correlated preferences via low-rank structure.
+
+    Model: v_{i,o} = u_i^T x_o + epsilon, clipped to [0, 1]
+
+    This captures scenarios where agents have similar underlying preferences
+    (e.g., item quality) but with individual variation.
+
+    Args:
+        n_agents: Number of agents
+        m_items: Number of items
+        rank: Rank of the latent factor matrices (controls correlation strength)
+        noise_scale: Standard deviation of Gaussian noise
+
+    Returns:
+        Valuation matrix with shape (n_agents, m_items), values in [0, 1]
+    """
+    # Latent factors: agents and items in shared latent space
+    u = np.random.randn(n_agents, rank)  # Agent embeddings
+    x = np.random.randn(rank, m_items)   # Item embeddings
+
+    # Base valuations from inner products
+    base = u @ x
+
+    # Normalize to roughly [0, 1] range before adding noise
+    base = (base - base.min()) / (base.max() - base.min() + 1e-8)
+
+    # Add Gaussian noise
+    noise = np.random.randn(n_agents, m_items) * noise_scale
+    valuations = base + noise
+
+    # Clip to [0, 1]
+    return np.clip(valuations, 0, 1)
+
+
+def generate_dataset(n_agents, n_items, num_matrices, output_file, seed=10, distribution='uniform'):
+    """Generate dataset of valuation matrices with precomputed max welfare values
+
+    Args:
+        n_agents: Number of agents
+        n_items: Number of items
+        num_matrices: Number of matrices to generate
+        output_file: Output file path
+        seed: Random seed
+        distribution: 'uniform' or 'correlated'
+    """
 
     matrices = []
     nash_values = []
@@ -26,14 +71,18 @@ def generate_dataset(n_agents, n_items, num_matrices, output_file, seed=10):
     # Set seed
     np.random.seed(seed * n_items + n_agents)
 
-    print(f"Generating {num_matrices} valuation matrices ({n_agents} agents, {n_items} items)...")
+    print(f"Generating {num_matrices} valuation matrices ({n_agents} agents, {n_items} items, {distribution} distribution)...")
 
     total_start_time = time.time()
 
     for i in tqdm(range(num_matrices), desc="Processing matrices"):
         # Time valuation matrix generation
         gen_start = time.time()
-        valuation_matrix = generate_valuation_matrix(n_agents, n_items)
+        if distribution == 'correlated':
+            rank = min(3, n_agents, n_items)
+            valuation_matrix = generate_correlated_valuation_matrix(n_agents, n_items, rank=rank)
+        else:
+            valuation_matrix = generate_valuation_matrix(n_agents, n_items)
         generation_times.append((time.time() - gen_start) * 1000)
 
         # Time Nash welfare calculation
@@ -119,16 +168,18 @@ def main():
     parser.add_argument('--items', type=int, default=14, help='Number of items (default: 14)')
     parser.add_argument('--num_matrices', type=int, required=True, help='Number of valuation matrices to generate')
     parser.add_argument('--output', type=str, required=False, help='Output .npz file to save the dataset, default: dataset_<agents>_<items>_<num_matrices>_dataset.npz')
+    parser.add_argument('--distribution', type=str, default='uniform', choices=['uniform', 'correlated'],
+                        help='Valuation distribution: uniform (default) or correlated (low-rank + noise)')
 
     args = parser.parse_args()
 
     if not args.output:
-        args.output = f"datasets/{args.agents}_{args.items}_{args.num_matrices}_dataset.npz"
+        args.output = f"datasets/{args.agents}_{args.items}_{args.num_matrices}_{args.distribution}_dataset.npz"
 
     if not args.output.endswith('.npz'):
         args.output += '.npz'
 
-    generate_dataset(args.agents, args.items, args.num_matrices, args.output)
+    generate_dataset(args.agents, args.items, args.num_matrices, args.output, distribution=args.distribution)
 
 if __name__ == "__main__":
     main()
